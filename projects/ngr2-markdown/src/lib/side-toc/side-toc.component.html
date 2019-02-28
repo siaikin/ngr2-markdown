@@ -1,0 +1,26 @@
+<div class="side-anchor-toc">
+  <ol class="nav">
+    <li *ngFor="let TOCItem of TOCInfo.children"
+        [ngClass]="['item-level-' + TOCItem.indentLevel, 'nav-item', 'nav-item-active']"
+    >
+      <a [href]="'#' + TOCItem.content"
+         [ngClass]="['nav-item-link']"
+         [ngStyle]="{'color': TOCItem.content === currentHeading ? themeColor : ''}"
+      >
+        <span>{{ TOCItem.content }}</span>
+      </a>
+      <ol class="nav">
+        <li *ngFor="let subItem of TOCItem.children"
+            [ngClass]="['item-level-' + subItem.indentLevel, 'nav-item', 'nav-item-active']"
+        >
+          <a [href]="'#' + subItem.content"
+             [ngClass]="['nav-item-link']"
+             [ngStyle]="{'color': subItem.content === currentHeading ? themeColor : ''}"
+          >
+            <span>{{ subItem.content }}</span>
+          </a>
+        </li>
+      </ol>
+    </li>
+  </ol>
+</div>

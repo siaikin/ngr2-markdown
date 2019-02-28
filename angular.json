@@ -129,6 +129,41 @@
           }
         }
       }
+    },
+    "ngr2-markdown": {
+      "root": "projects/ngr2-markdown",
+      "sourceRoot": "projects/ngr2-markdown/src",
+      "projectType": "library",
+      "prefix": "nb",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-ng-packagr:build",
+          "options": {
+            "tsConfig": "projects/ngr2-markdown/tsconfig.lib.json",
+            "project": "projects/ngr2-markdown/ng-package.json"
+          }
+        },
+        "test": {
+          "builder": "@angular-devkit/build-angular:karma",
+          "options": {
+            "main": "projects/ngr2-markdown/src/test.ts",
+            "tsConfig": "projects/ngr2-markdown/tsconfig.spec.json",
+            "karmaConfig": "projects/ngr2-markdown/karma.conf.js"
+          }
+        },
+        "lint": {
+          "builder": "@angular-devkit/build-angular:tslint",
+          "options": {
+            "tsConfig": [
+              "projects/ngr2-markdown/tsconfig.lib.json",
+              "projects/ngr2-markdown/tsconfig.spec.json"
+            ],
+            "exclude": [
+              "**/node_modules/**"
+            ]
+          }
+        }
+      }
     }
   },
   "defaultProject": "ngr2-markdown-example"

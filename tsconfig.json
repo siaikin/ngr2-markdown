@@ -17,6 +17,14 @@
     "lib": [
       "es2018",
       "dom"
-    ]
+    ],
+    "paths": {
+      "ngr2-markdown": [
+        "dist/ngr2-markdown"
+      ],
+      "ngr2-markdown/*": [
+        "dist/ngr2-markdown/*"
+      ]
+    }
   }
 }

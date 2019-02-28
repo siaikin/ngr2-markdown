@@ -1,0 +1,54 @@
+.side-anchor-toc {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  margin: 0 auto;
+  padding: 20px;
+  color: gray;
+}
+
+.side-anchor-toc a {
+  color: dimgray;
+}
+
+.nav {
+  margin: 0;
+}
+
+.nav-item {
+  line-height: 1.8;
+  cursor: pointer;
+}
+
+.nav-item-active {
+
+}
+
+.nav-item-link {
+  text-decoration: none;
+  outline: none;
+}
+
+.item-level-1 {
+
+}
+
+.item-level-2 {
+
+}
+
+.item-level-3 {
+
+}
+
+.item-level-4 {
+
+}
+
+.item-level-5 {
+
+}
+
+.item-level-6 {
+
+}

@@ -1,0 +1,21 @@
+.main-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 40px;
+  box-sizing: border-box;
+  padding: 5px;
+  background-color: lightgray;
+}
+
+.toolbar button {
+}
+
+.markdown {
+  flex: 1;
+}

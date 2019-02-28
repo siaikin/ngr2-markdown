@@ -1,0 +1,24 @@
+.markdown-body {
+  overflow-y: auto;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 45px;
+  min-width: 200px;
+  height: 100%;
+}
+
+@media (max-width: 767px) {
+  .markdown-body {
+    padding: 15px;
+  }
+}
+.markdown-container {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  flex: 1 auto;
+}
+
+.side-anchor-container {
+  flex: 0 0 200px;
+}

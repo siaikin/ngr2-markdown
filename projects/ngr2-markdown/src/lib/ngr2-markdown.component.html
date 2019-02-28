@@ -1,10 +1,15 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
-
-</body>
-</html>
+<div class="markdown-container"
+     [style.height]="height"
+>
+  <nb-side-toc class="side-anchor-container"
+               *ngIf="_options.TOC"
+  >
+  </nb-side-toc>
+  <div style="flex: 3;"
+       [ngClass]="[bodyClassName]"
+       #markdownBody
+       [innerHTML]="_html | hTMLPipe"
+       (scroll)="markdownScroll()"
+  >
+  </div>
+</div>
