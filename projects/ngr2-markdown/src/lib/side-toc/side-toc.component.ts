@@ -24,7 +24,6 @@ export class SideTocComponent implements OnInit {
     this.markdownService.TOCInfo.subscribe({
       next: (value => {
         this.TOCInfo = value;
-        console.log(value);
       })
     });
   }
