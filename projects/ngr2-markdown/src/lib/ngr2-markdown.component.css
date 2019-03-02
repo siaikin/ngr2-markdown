@@ -20,5 +20,6 @@
 }
 
 .side-anchor-container {
-  flex: 0 0 200px;
+  flex: 0 auto;
+  max-width: 200px;
 }

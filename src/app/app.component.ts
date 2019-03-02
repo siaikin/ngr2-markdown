@@ -1,5 +1,5 @@
 import {AfterViewChecked, AfterViewInit, Component} from '@angular/core';
-import {Ngr2MarkdownService} from '../../projects/ngr2-markdown/src/lib/ngr2-markdown.service';
+import {Ngr2MarkdownService} from '../../projects/ngr2-markdown/src/lib/service/ngr2-markdown.service';
 
 @Component({
   selector: 'app-root',

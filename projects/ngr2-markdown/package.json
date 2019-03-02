@@ -1,6 +1,6 @@
 {
   "name": "ngr2-markdown",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "homepage": "",
   "repository": {
     "type": "git",
@@ -9,12 +9,12 @@
   "peerDependencies": {
     "@angular/common": "^7.2.0",
     "@angular/core": "^7.2.0",
-    "@types/highlight.js": "^9.12.3",
-    "@types/markdown-it": "0.0.7",
-    "github-markdown-css": "^3.0.1",
-    "highlight.js": "^9.14.2",
-    "markdown-it": "^8.4.2"
+    "rxjs": "~6.3.3"
   },
   "dependencies": {
+    "@types/highlight.js": "^9.12.3",
+    "@types/markdown-it": "0.0.7",
+    "highlight.js": "^9.14.2",
+    "markdown-it": "^8.4.2"
   }
 }

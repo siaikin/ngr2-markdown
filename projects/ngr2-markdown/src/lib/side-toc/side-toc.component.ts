@@ -1,5 +1,5 @@
 import {Component, Input, OnInit} from '@angular/core';
-import {Ngr2MarkdownService, TOCItem} from '../ngr2-markdown.service';
+import {Ngr2MarkdownService, TOCItem} from '../service/ngr2-markdown.service';
 
 @Component({
   selector: 'nb-side-toc',

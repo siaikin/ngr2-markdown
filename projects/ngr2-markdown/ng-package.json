@@ -3,5 +3,11 @@
   "dest": "../../dist/ngr2-markdown",
   "lib": {
     "entryFile": "src/public_api.ts"
-  }
+  },
+  "whitelistedNonPeerDependencies": [
+    "@types/highlight.js",
+    "@types/markdown-it",
+    "highlight.js",
+    "markdown-it"
+  ]
 }

@@ -13,7 +13,9 @@ import {
   Component,
   ElementRef,
   Input, OnInit, ViewChild, ViewEncapsulation} from '@angular/core';
-import {MarkdownOption, Ngr2MarkdownService, TOCItem} from './ngr2-markdown.service';
+import {MarkdownOption, Ngr2MarkdownService, TOCItem} from './service/ngr2-markdown.service';
+import {fromEvent} from 'rxjs';
+import {distinct, distinctUntilChanged, filter, map} from 'rxjs/operators';
 
 @Component({
   selector: 'nb-ngr2-markdown',
@@ -60,23 +62,20 @@ export class Ngr2MarkdownComponent implements OnInit {
   @Input()
   set options(value: MarkdownOption) {
     this._options = value;
-    this.markdownService.toggle(this._options);
   }
-  @Input() bodyClassName = 'markdown-body';
-  /**
-   * container height property
-   */
-  @Input() height = '800px';
-  /**
-   * container toc active color property
-   */
-  @Input() themeColor = '#3f51b5';
 
   constructor(private markdownService: Ngr2MarkdownService
   ) {
   }
 
   ngOnInit() {
+    fromEvent(this.markdownBody.nativeElement, 'scroll')
+      .pipe(
+        filter(() => this.headingElementRef && this.headingElementRef.length > 0),
+        map(() => this.markdownScroll()),
+        distinctUntilChanged()
+      )
+      .subscribe(this.markdownService.currentHeading);
   }
 
   reinitialization() {
@@ -98,12 +97,7 @@ export class Ngr2MarkdownComponent implements OnInit {
    * 基于父元素的顶部位置, 判断当前浏览的标题内容
    * 选出标题元素(h1 ~ h6)的顶部在父元素(class=markdown)顶部之上或相等的元素, 作为当前浏览的标题
    */
-  markdownScroll() {
-    if (this.headingElementRef === undefined
-      || this.headingElementRef === null
-      || this.headingElementRef.length <= 0) {
-      return;
-    }
+  markdownScroll(): string {
     // 父元素顶部的坐标
     const baseOffsetTop = (<HTMLElement> this.markdownBody.nativeElement).getBoundingClientRect().top;
     let preRect: ClientRect;
@@ -126,7 +120,7 @@ export class Ngr2MarkdownComponent implements OnInit {
         return previousValue;
       }
     });
-    this.markdownService.setCurrentHeading(elem.id);
+    return elem.id;
   }
 
   /**
@@ -142,9 +136,7 @@ export class Ngr2MarkdownComponent implements OnInit {
     nodeList.forEach((value: HTMLElement) => {
       // 提取element的样式
       const marginTop = this.getComputedStyle(value, 'margin-top');
-      // 去除px
-      marginTop.slice(0, marginTop.length - 2);
-      this.headingElementMarginTop[value.id] = Number.parseInt(marginTop, 10);
+      this.headingElementMarginTop[value.id] = this.markdownService.checkUnit(marginTop).number;
     });
     this.headingElementRef.push(...nodeList);
   }

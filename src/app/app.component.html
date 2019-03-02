@@ -5,10 +5,8 @@
     <button (click)="changeContentToNull()">change content to null</button>
   </div>
   <nb-ngr2-markdown
-    [options]="{anchor: true, TOC: true}"
+    [options]="{TOC: true, direction: 'left', bodyClassName: 'markdown-body', height: 'calc(100vh - 40px)', themeColor: '#3f51a5'}"
     [markdown]="content"
-    [bodyClassName]="'markdown-body'"
-    [height]="'calc(100vh - 40px)'"
     class="markdown"
   ></nb-ngr2-markdown>
 </div>

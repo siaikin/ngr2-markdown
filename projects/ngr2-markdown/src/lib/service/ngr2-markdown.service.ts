@@ -1,7 +1,7 @@
 import {Injectable} from '@angular/core';
 import * as MarkdownIt from 'markdown-it/lib/index';
-import * as hljs from 'highlight.js';
-import {BehaviorSubject} from 'rxjs';
+import {BehaviorSubject, Observer} from 'rxjs';
+import {MarkdownImpl, MarkdownOptionImpl} from '../core/markdown';
 
 @Injectable({
   providedIn: 'root'
@@ -187,7 +187,7 @@ export class Ngr2MarkdownService {
       }
     }
   };
-  MarkdownIt: MarkdownIt;
+  markdownIt: MarkdownImpl;
   /**
    * 当前浏览的标题的Subject, BehaviorSubject可支持多播(在多处订阅)
    */
@@ -198,69 +198,53 @@ export class Ngr2MarkdownService {
   TOCInfo: BehaviorSubject<TOCItem> = new BehaviorSubject<TOCItem>(null);
 
   constructor() {
-    this.MarkdownIt = new MarkdownIt({
-      highlight: (str: string, lang: string) => {
-        if (lang && hljs.getLanguage(lang)) {
-          try {
-            return '<pre class="hljs"><code>' +
-              hljs.highlight(lang, str).value +
-              '</code></pre>';
-          } catch (__) {}
+    this.markdownIt = new MarkdownImpl();
+    this.markdownIt.use(this.anchor)
+      .subscribe((value: Array<any>) => {
+        const infoList = value.map((item) => {
+          return new TOCItem(item.content, item.indentLevel);
+        });
+        const root = new TOCItem('root', 0);
+        let TOCInfo = root;
+        for (let i = 0; i < infoList.length; i++) {
+          while (TOCInfo && TOCInfo.indentLevel >= infoList[i].indentLevel) {
+            TOCInfo = TOCInfo.parent;
+          }
+          infoList[i].parent = TOCInfo;
+          TOCInfo.children.push(infoList[i]);
+          TOCInfo = infoList[i];
         }
-        return '<pre class="hljs"><code>' + this.MarkdownIt.utils.escapeHtml(str) + '</code>';
-      }
-    });
-    this.MarkdownIt.use(this.anchor, (value) => this.TOCInfo.next(value));
+        this.TOCInfo.next(root);
+      });
   }
 
-  toggle(options: MarkdownOption) {
-    options.anchor ? this.MarkdownIt.enable('anchor') : this.MarkdownIt.disable('anchor');
-    options.TOC ? this.MarkdownIt.enable('anchor') : this.MarkdownIt.disable('anchor');
-  }
-
-  /**
-   * render markdown text function
-   * 渲染函数
-   * @param markdown - markdown format text - markdown格式的文本
-   * @return - return transformation html - 返回渲染后的html
-   */
-  render(markdown: string): string {
+  render(markdown: string, options?: MarkdownOptionImpl): string {
     if (typeof markdown !== 'string') {
       markdown = '';
     }
-    return this.MarkdownIt.render(markdown);
+    return this.markdownIt.render(markdown, options);
   }
 
   /**
+   * Plugin: anchor
    * 这个方法向类型为heading_open的token添加id, 用于锚点定位
-   * 并提取id和标题等级
-   * 使用方法见this.init()
    * @param md - MarkdownIt instance
-   * @param callBack - callBack function look this.init()
+   * @param observer - use to push info
    */
-  private anchor(md: MarkdownIt, callBack: (value: TOCItem) => void) {
-    let rootTOCInfo = new TOCItem('root', 0);
-    md.core.ruler.push('anchor', (state) => {
-      const infoList: Array<TOCItem> = new Array<TOCItem>();
+  private anchor(md: MarkdownIt, observer: Observer<Array<any>>) {
+    md.core.ruler.push('anchor', (state => {
+      const infoList: Array<any> = new Array<any>();
       state.tokens.map((token, index, array) => {
         if (token.type === 'heading_open') {
           token.attrJoin('id', array[index + 1].content);
-          infoList.push(new TOCItem(token.attrGet('id'), token.markup.length));
+          infoList.push({
+            content: token.attrGet('id'),
+            indentLevel: token.markup.length
+          });
         }
       });
-
-      rootTOCInfo = new TOCItem('root', 0);
-      let TOCInfo = rootTOCInfo;
-      for (let i = 0; i < infoList.length; i++) {
-        while (TOCInfo && TOCInfo.indentLevel >= infoList[i].indentLevel) {
-          TOCInfo = TOCInfo.parent;
-        }
-        infoList[i].parent = TOCInfo;
-        TOCInfo.children.push(infoList[i]);
-        TOCInfo = infoList[i];
-      }
-      callBack(rootTOCInfo);
-    });
+      observer.next(infoList);
+    }));
   }
 
   /**
@@ -273,7 +257,7 @@ export class Ngr2MarkdownService {
     }
   }
 
-  checkUnit(unitMap: any, str: string, caseSensitive?: boolean): {
+  checkUnit(str: string, unitMap: any = this.unitMap, caseSensitive?: boolean): {
     unit: string,
     number: number
   } {
@@ -297,9 +281,41 @@ export class Ngr2MarkdownService {
   }
 }
 
+/**
+ * 目录(TOC)生成的位置
+ * start: TOC在内容左边
+ * end: 右边
+ */
+type tocPos = 'left' | 'right';
+
 export class MarkdownOption {
   anchor: boolean;
   TOC: boolean;
+  direction: tocPos;
+  /**
+   * container height property
+   */
+  height: string;
+  /**
+   * container toc active color property
+   */
+  themeColor: string;
+  bodyClassName: string;
+
+  constructor(anchor: boolean = false,
+              TOC: boolean = false,
+              direction: tocPos = 'left',
+              height: string = '800px',
+              themeColor: string = '#3f51b5',
+              bodyClassName: string = 'markdown-body'
+  ) {
+    this.anchor = anchor;
+    this.TOC = TOC;
+    this.direction = direction;
+    this.height = height;
+    this.themeColor = themeColor;
+    this.bodyClassName = bodyClassName;
+  }
 }
 
 export class TOCItem {

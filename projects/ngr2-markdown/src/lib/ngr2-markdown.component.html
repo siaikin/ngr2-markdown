@@ -1,15 +1,16 @@
 <div class="markdown-container"
-     [style.height]="height"
+     [style.height]="_options.height"
+     [style.flex-direction]="_options.direction === 'left' ? 'row' : 'row-reverse'"
 >
   <nb-side-toc class="side-anchor-container"
+               [themeColor]="_options.themeColor"
                *ngIf="_options.TOC"
   >
   </nb-side-toc>
   <div style="flex: 3;"
-       [ngClass]="[bodyClassName]"
+       [ngClass]="[_options.bodyClassName]"
        #markdownBody
-       [innerHTML]="_html | hTMLPipe"
-       (scroll)="markdownScroll()"
+       [innerHTML]="_html | html"
   >
   </div>
 </div>
