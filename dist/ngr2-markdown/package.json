@@ -1,0 +1,31 @@
+{
+  "name": "ngr2-markdown",
+  "version": "0.1.3",
+  "homepage": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abc1310054026/ngr2-markdown.git"
+  },
+  "peerDependencies": {
+    "@angular/common": "^7.2.0",
+    "@angular/core": "^7.2.0",
+    "rxjs": "~6.3.3"
+  },
+  "dependencies": {
+    "@types/highlight.js": "^9.12.3",
+    "@types/markdown-it": "0.0.7",
+    "highlight.js": "^9.14.2",
+    "markdown-it": "^8.4.2",
+    "tslib": "^1.9.0"
+  },
+  "main": "bundles/ngr2-markdown.umd.js",
+  "module": "fesm5/ngr2-markdown.js",
+  "es2015": "fesm2015/ngr2-markdown.js",
+  "esm5": "esm5/ngr2-markdown.js",
+  "esm2015": "esm2015/ngr2-markdown.js",
+  "fesm5": "fesm5/ngr2-markdown.js",
+  "fesm2015": "fesm2015/ngr2-markdown.js",
+  "typings": "ngr2-markdown.d.ts",
+  "metadata": "ngr2-markdown.metadata.json",
+  "sideEffects": false
+}
