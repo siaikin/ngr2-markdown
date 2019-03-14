@@ -121,7 +121,6 @@ export class DragAndDropDirective implements OnInit {
 
   /**
    * 演示鼠标拖动元素释放后的状态
-   * @private
    */
   private _transitDemonstration() {
     this._insertBefore(this.dadService.getCurrentElement());
@@ -129,7 +128,6 @@ export class DragAndDropDirective implements OnInit {
 
   /**
    * 演示结束, 移除元素
-   * @private
    */
   private _transitDemonstrationFinish() {
     this._removeElement(this.dadService.getCurrentElement());
@@ -138,7 +136,6 @@ export class DragAndDropDirective implements OnInit {
   /**
    * 获取被鼠标拖动的元素
    * @param ev
-   * @private
    */
   private _getDragElement(ev: DragEvent): Element {
     return this.dadService.get(ev.dataTransfer.getData('text/timestamp'));
@@ -152,7 +149,7 @@ export class DragAndDropDirective implements OnInit {
    * `nextElementSibling`: ie8,ie9,safari不兼容
    * 见: https://developer.mozilla.org/en-US/docs/Web/API/NonDocumentTypeChildNode/nextElementSibling
    * @param el - insert element
-   * @return {Element} - return inserted element
+   * @return - return inserted element
    */
   private _insertAfter(el: Element): Element {
     if (!this._el.nextElementSibling) {
