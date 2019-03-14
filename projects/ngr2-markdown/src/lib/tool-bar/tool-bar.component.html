@@ -1,0 +1,10 @@
+<a [download]="title + '.md'"
+   [href]="mdHref | safe:'url'"
+>
+  MD
+</a>
+<a [download]="title + '.html'"
+   [href]="htmlHref | safe:'url'"
+>
+  HTML
+</a>

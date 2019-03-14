@@ -13,9 +13,9 @@ import {
   Component,
   ElementRef,
   Input, OnInit, ViewChild, ViewEncapsulation} from '@angular/core';
-import {MarkdownOption, Ngr2MarkdownService, TOCItem} from './service/ngr2-markdown.service';
+import {MarkdownOption, Mode, Ngr2MarkdownService} from './service/ngr2-markdown.service';
 import {fromEvent} from 'rxjs';
-import {distinct, distinctUntilChanged, filter, map} from 'rxjs/operators';
+import {distinctUntilChanged, filter, map} from 'rxjs/operators';
 
 @Component({
   selector: 'nb-ngr2-markdown',
@@ -63,6 +63,8 @@ export class Ngr2MarkdownComponent implements OnInit {
   set options(value: MarkdownOption) {
     this._options = value;
   }
+
+  @Input() mode: Mode;
 
   constructor(private markdownService: Ngr2MarkdownService
   ) {

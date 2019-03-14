@@ -1,16 +1,23 @@
-<div class="markdown-container"
+<div class="main-panel"
      [style.height]="_options.height"
-     [style.flex-direction]="_options.direction === 'left' ? 'row' : 'row-reverse'"
 >
-  <nb-side-toc class="side-anchor-container"
-               [themeColor]="_options.themeColor"
-               *ngIf="_options.TOC"
-  >
-  </nb-side-toc>
-  <div style="flex: 3;"
-       [ngClass]="[_options.bodyClassName]"
-       #markdownBody
-       [innerHTML]="_html | html"
-  >
+  <nb-tool-bar class="tool-bar"
+               nbDragAndDrop
+               [droppable]="true"
+  ></nb-tool-bar>
+  <div class="content-panel content-container">
+    <nb-file-browser class="file-browser"></nb-file-browser>
+    <nb-edit-box *ngIf="mode === 'edit'"
+                 [ngClass]="'editor'"
+    >
+    </nb-edit-box>
+    <nb-control-bar class="control-bar"></nb-control-bar>
+    <article #markdownBody
+             [ngClass]="[_options.bodyClassName]"
+             [innerHTML]="_html | safe:'html'"
+    >
+    </article>
+    <nb-menu class="menu"></nb-menu>
   </div>
+  <nb-status-bar class="status-bar" nbDragAndDrop [droppable]="true"></nb-status-bar>
 </div>

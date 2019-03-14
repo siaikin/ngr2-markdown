@@ -1,0 +1,21 @@
+.edit-box {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.edit-tool-bar {
+  /* 定义基础高度25px */
+  flex: 0 0 25px;
+}
+
+/* 可编辑内容占据剩余的空间 */
+.edit-content {
+  overflow-y: auto;
+  /* 不可分割单词强制换行 */
+  overflow-wrap: break-word;
+  flex: auto;
+  outline: none;
+  border: 1px gray solid;
+  padding: 8px;
+}

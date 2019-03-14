@@ -1,4 +1,16 @@
+.main-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  /* 内边距15px */
+  box-sizing: border-box;
+  padding: 15px;
+}
+
+/* 预览框 */
 .markdown-body {
+  flex: 1;
   overflow-y: auto;
   box-sizing: border-box;
   margin: 0 auto;
@@ -7,19 +19,54 @@
   height: 100%;
 }
 
-@media (max-width: 767px) {
-  .markdown-body {
-    padding: 15px;
-  }
-}
-.markdown-container {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  flex: 1 auto;
+/* 编辑框 */
+.editor {
+  flex: 1;
+  overflow-y: auto;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 5px;
+  min-width: 200px;
+  height: 100%;
 }
 
-.side-anchor-container {
+.content-container {
+  display: flex;
+  flex-direction: row;
+}
+
+/* 侧边栏目录 */
+.side-toc-container {
   flex: 0 auto;
   max-width: 200px;
+}
+
+.tool-bar {
+  flex: 0 0 25px;
+  background-color: lightgray;
+}
+
+.content-panel {
+  flex: 1 1 auto;
+  background-color: darkgray;
+}
+
+.status-bar {
+  flex: 0 0 15px;
+  background-color: gray;
+}
+
+.file-browser {
+  flex: 0 0 200px;
+  background-color: dimgray;
+}
+
+.control-bar {
+  flex: 0 0 15px;
+  background-color: antiquewhite;
+}
+
+.menu {
+  flex: 0 0 200px;
+  background-color: lightslategray;
 }

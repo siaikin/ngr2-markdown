@@ -84,6 +84,7 @@ cause=org.hibernate.PropertyNotFoundException: no appropriate constructor in cla
   constructor(
     private markdownService: Ngr2MarkdownService
   ) {
+    this.content = this.exampleText2;
   }
 
   ngAfterViewInit(): void {

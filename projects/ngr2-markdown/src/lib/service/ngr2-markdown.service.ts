@@ -1,7 +1,9 @@
 import {Injectable} from '@angular/core';
 import * as MarkdownIt from 'markdown-it/lib/index';
-import {BehaviorSubject, Observer} from 'rxjs';
+import {BehaviorSubject, Observable, Observer} from 'rxjs';
 import {MarkdownImpl, MarkdownOptionImpl} from '../core/markdown';
+import {FileOperatorImpl} from '../core/fileOperator';
+import {filter, map} from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -192,6 +194,7 @@ export class Ngr2MarkdownService {
    * 当前浏览的标题的Subject, BehaviorSubject可支持多播(在多处订阅)
    */
   currentHeading: BehaviorSubject<string> = new BehaviorSubject<string>(null);
+  currentContent: BehaviorSubject<{md: string, html: string}> = new BehaviorSubject<{md: string, html: string}>(null);
   /**
    * 发送目录信息的Subject
    */
@@ -222,29 +225,12 @@ export class Ngr2MarkdownService {
     if (typeof markdown !== 'string') {
       markdown = '';
     }
-    return this.markdownIt.render(markdown, options);
-  }
-
-  /**
-   * Plugin: anchor
-   * 这个方法向类型为heading_open的token添加id, 用于锚点定位
-   * @param md - MarkdownIt instance
-   * @param observer - use to push info
-   */
-  private anchor(md: MarkdownIt, observer: Observer<Array<any>>) {
-    md.core.ruler.push('anchor', (state => {
-      const infoList: Array<any> = new Array<any>();
-      state.tokens.map((token, index, array) => {
-        if (token.type === 'heading_open') {
-          token.attrJoin('id', array[index + 1].content);
-          infoList.push({
-            content: token.attrGet('id'),
-            indentLevel: token.markup.length
-          });
-        }
-      });
-      observer.next(infoList);
-    }));
+    const html = this.markdownIt.render(markdown, options);
+    this.currentContent.next({
+      md: markdown,
+      html
+    });
+    return html;
   }
 
   /**
@@ -279,6 +265,51 @@ export class Ngr2MarkdownService {
       number: Number.parseInt(str.substr(0, i + 1), 10)
     } : null;
   }
+
+
+  /**
+   * 将当前显示的内容转换成`data:`url
+   * @param type - `markdown`/`html`: 要转换的内容
+   */
+  currentContentToDataUrl(type: string): FileOperatorImpl {
+    const fileOperator = new FileOperatorImpl();
+    let file: File;
+    switch (type) {
+      case 'markdown':
+        file = new File([this.currentContent.getValue().md], 'markdown', {type: 'text/plain'});
+        break;
+      case `html`:
+        file = new File([this.currentContent.getValue().html], 'html', {type: 'text/html'});
+        break;
+      default:
+        file = new File(['null'], 'html', {type: 'text/html'});
+        break;
+    }
+    fileOperator.toDataURLSync(file);
+    return fileOperator;
+  }
+
+  /**
+   * Plugin: anchor
+   * 这个方法向类型为heading_open的token添加id, 用于锚点定位
+   * @param md - MarkdownIt instance
+   * @param observer - use to push info
+   */
+  private anchor(md: MarkdownIt, observer: Observer<Array<any>>) {
+    md.core.ruler.push('anchor', (state => {
+      const infoList: Array<any> = new Array<any>();
+      state.tokens.map((token, index, array) => {
+        if (token.type === 'heading_open') {
+          token.attrJoin('id', array[index + 1].content);
+          infoList.push({
+            content: token.attrGet('id'),
+            indentLevel: token.markup.length
+          });
+        }
+      });
+      observer.next(infoList);
+    }));
+  }
 }
 
 /**
@@ -286,12 +317,19 @@ export class Ngr2MarkdownService {
  * start: TOC在内容左边
  * end: 右边
  */
-type tocPos = 'left' | 'right';
+export type TocPos = 'left' | 'right';
+/**
+ * 模式
+ * preview: 预览模式
+ * edit: 编辑模式
+ */
+export type Mode = 'preview' | 'edit';
 
 export class MarkdownOption {
   anchor: boolean;
   TOC: boolean;
-  direction: tocPos;
+  toolBar: boolean;
+  direction: TocPos;
   /**
    * container height property
    */
@@ -304,13 +342,15 @@ export class MarkdownOption {
 
   constructor(anchor: boolean = false,
               TOC: boolean = false,
-              direction: tocPos = 'left',
+              toolBar: boolean = false,
+              direction: TocPos = 'left',
               height: string = '800px',
               themeColor: string = '#3f51b5',
               bodyClassName: string = 'markdown-body'
   ) {
     this.anchor = anchor;
     this.TOC = TOC;
+    this.toolBar = toolBar;
     this.direction = direction;
     this.height = height;
     this.themeColor = themeColor;
