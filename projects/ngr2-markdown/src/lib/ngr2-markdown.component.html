@@ -2,22 +2,29 @@
      [style.height]="_options.height"
 >
   <nb-tool-bar class="tool-bar"
-               nbDragAndDrop
-               [droppable]="true"
   ></nb-tool-bar>
-  <div class="content-panel content-container">
-    <nb-file-browser class="file-browser"></nb-file-browser>
+  <div class="content-panel content-container"
+       nbDragAndDrop
+  >
+    <nb-file-browser class="file-browser"
+    >
+    </nb-file-browser>
     <nb-edit-box *ngIf="mode === 'edit'"
                  [ngClass]="'editor'"
     >
     </nb-edit-box>
-    <nb-control-bar class="control-bar"></nb-control-bar>
+    <nb-control-bar class="control-bar"
+    >
+    </nb-control-bar>
     <article #markdownBody
              [ngClass]="[_options.bodyClassName]"
              [innerHTML]="_html | safe:'html'"
     >
     </article>
-    <nb-menu class="menu"></nb-menu>
+    <nb-menu class="menu"
+    >
+    </nb-menu>
   </div>
-  <nb-status-bar class="status-bar" nbDragAndDrop [droppable]="true"></nb-status-bar>
+  <nb-status-bar class="status-bar"
+  ></nb-status-bar>
 </div>

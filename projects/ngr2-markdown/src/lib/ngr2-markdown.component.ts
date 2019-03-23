@@ -16,6 +16,8 @@ import {
 import {MarkdownOption, Mode, Ngr2MarkdownService} from './service/ngr2-markdown.service';
 import {fromEvent} from 'rxjs';
 import {distinctUntilChanged, filter, map} from 'rxjs/operators';
+import {DragAndDropElement} from './core/dad/dragAndDrop';
+import {DragAndDropEvent} from './core/dad/dragAndDropEvent';
 
 @Component({
   selector: 'nb-ngr2-markdown',

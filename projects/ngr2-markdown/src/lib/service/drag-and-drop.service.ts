@@ -1,5 +1,6 @@
 import {Injectable, OnInit} from '@angular/core';
 import {BehaviorSubject} from 'rxjs';
+import {DragAndDropElement} from '../core/dad/dragAndDrop';
 
 @Injectable({
   providedIn: 'root'
@@ -8,10 +9,10 @@ export class DragAndDropService {
   private elementMap: {
     [key: string]: Element
   } = {};
-  currentDragElement: BehaviorSubject<Element>;
+  currentDragElement: BehaviorSubject<DragAndDropElement>;
 
   constructor() {
-    this.currentDragElement = new BehaviorSubject<Element>(null);
+    this.currentDragElement = new BehaviorSubject<DragAndDropElement>(null);
   }
 
   push(key: string, value: Element): string {
@@ -30,11 +31,11 @@ export class DragAndDropService {
     this.elementMap[key] = null;
   }
 
-  setCurrentElement(el: Element) {
+  setCurrentElement(el: DragAndDropElement) {
     this.currentDragElement.next(el);
   }
 
-  getCurrentElement(): Element {
+  getCurrentElement(): DragAndDropElement {
     return this.currentDragElement.getValue();
   }
 }
