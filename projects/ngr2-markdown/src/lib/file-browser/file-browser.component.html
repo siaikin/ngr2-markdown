@@ -1,1 +1,60 @@
-file browser
+<div class="file-browser">
+  <header class="fb-header"
+  >
+    <button class="fb-button fb-button_hover"
+            (click)="createFile()"
+    >
+      <i class="material-icons md-dark">
+        note_add
+      </i>
+    </button>
+    <!--创建文件夹暂时不可用-->
+    <!--(click)="createFolder()"-->
+    <button class="fb-button fb-button_disable"
+            style="opacity: 0.5;"
+    >
+      <i class="material-icons md-dark">
+        create_new_folder
+      </i>
+    </button>
+    <button class="fb-button fb-button_hover"
+            (click)="delete()"
+    >
+      <i class="material-icons md-dark">
+        delete
+      </i>
+    </button>
+    <button class="fb-button fb-button_hover"
+            (click)="rename()"
+    >
+      <i class="material-icons md-dark">
+        edit
+      </i>
+    </button>
+    <button class="fb-button fb-button_hover fb-button_close"
+            (click)="close()"
+    >
+      <i class="material-icons md-dark">
+        close
+      </i>
+    </button>
+  </header>
+  <aside class="fb-list"
+  >
+    <ul class="fb-ul"
+        #fileList
+    >
+      <li class="fb-li fb-li_hover" *ngFor="let article of articles"
+          (click)="select($any($event.currentTarget), article)"
+          (dblclick)="open($any($event.currentTarget), article)"
+      >
+        <i class="material-icons md-18 md-dark">
+          insert_drive_file
+        </i>
+        <span>
+          {{ article.title }}
+        </span>
+      </li>
+    </ul>
+  </aside>
+</div>

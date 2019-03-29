@@ -1,12 +1,10 @@
-import {fromEvent} from 'rxjs';
-import {filter, throttleTime} from 'rxjs/operators';
 import {DragAndDropContainer} from './dragAndDropContainer';
 import {DragAndDropEvent, DragAndDropEventType} from './dragAndDropEvent';
 
 export class DragAndDropElement {
 
   static ELEMENT_STYLE: CSSStyle = {
-    cursor: 'grab'
+    // cursor: 'grab'
   };
   static DEMO_STYLE: CSSStyle = {
     opacity: '0.5'
@@ -62,10 +60,12 @@ export class DragAndDropElement {
       {
         'dragstart': {
           eventType: DragAndDropEventType.DRAG_START,
+          stopPropagation: true,
           listener: this.ondragstart.bind(this)
         },
         'drag': {
           eventType: DragAndDropEventType.DRAG,
+          stopPropagation: true,
           listener: this.ondrag.bind(this),
           operatorOptions: {
             throttleTime: 1000
@@ -73,6 +73,7 @@ export class DragAndDropElement {
         },
         'dragend': {
           eventType: DragAndDropEventType.DRAG_END,
+          stopPropagation: true,
           listener: this.ondragend.bind(this),
         },
         'dragenter': {
@@ -81,6 +82,9 @@ export class DragAndDropElement {
           preventDefault: true,
           operatorOptions: {
             filter: (event) => {
+              if (!this.parentContainer.equals(event)) {
+                return false;
+              }
               return this._el !== this.parentContainer.getDragElement()._el && this._el === event.target;
             }
           }
@@ -91,6 +95,9 @@ export class DragAndDropElement {
           operatorOptions: {
             throttleTime: 100,
             filter: (event) => {
+              if (!this.parentContainer.equals(event)) {
+                return false;
+              }
               return this._el !== this.parentContainer.getDragElement()._el;
             }
           },
@@ -98,10 +105,10 @@ export class DragAndDropElement {
         },
         'drop': {
           eventType: DragAndDropEventType.DROP,
+          stopPropagation: true,
           listener: this.ondrop.bind(this)
         }
-      },
-      event1 => true);
+      });
     this._dadEvent.observable
       .subscribe(value => {});
 
@@ -112,6 +119,9 @@ export class DragAndDropElement {
       (rect.top + rect.height / 2));
   }
 
+  /**
+   * @deprecated
+   */
   reset(): void {
     this.transitDemonstrationFinish(this.parentContainer.getDragElement());
   }
@@ -124,7 +134,7 @@ export class DragAndDropElement {
   private ondragstart(ev: DragEvent) {
     console.group('on drop start');
     this.status = 'drag';
-    this.parentContainer.setDragElement(this);
+    this.parentContainer.setDragElement(this, ev);
     console.groupEnd();
   }
 

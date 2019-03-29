@@ -11,11 +11,11 @@
 
 /* 可编辑内容占据剩余的空间 */
 .edit-content {
-  overflow-y: auto;
+  flex: auto;
+  overflow: auto;
   /* 不可分割单词强制换行 */
   overflow-wrap: break-word;
-  flex: auto;
   outline: none;
-  border: 1px gray solid;
-  padding: 8px;
+  padding: 20px;
+  background-color: white;
 }

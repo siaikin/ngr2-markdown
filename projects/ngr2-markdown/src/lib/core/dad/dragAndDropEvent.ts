@@ -13,7 +13,7 @@ export enum DragAndDropEventType {
 
 export interface DragAndDropEventOptions {
   eventType: DragAndDropEventType;
-  listener: (event: DragEvent) => void | boolean,
+  listener?: (event: DragEvent) => void | boolean;
   preventDefault?: boolean;
   stopPropagation?: boolean;
   operatorOptions?: {
@@ -23,11 +23,11 @@ export interface DragAndDropEventOptions {
   eventOptions?: EventListenerOptions;
 }
 
+// @dynamic
 export class DragAndDropEvent {
 
   /* tslint:disable */
   static defaultFun = event => { console.group('on ' + event.type); console.groupEnd(); };
-  /* tslint:disable */
   static ALL_OPTIONS: { [key: string]: DragAndDropEventOptions } = {
     'dragstart': {
       eventType: DragAndDropEventType.DRAG_START,
@@ -66,6 +66,7 @@ export class DragAndDropEvent {
   el: Element;
   observable: Observable<DragEvent>;
   options: { [key: string]: DragAndDropEventOptions };
+  /*tslint:enable*/
 
   // listeners: { [key: string]: (event: DragEvent) => void | boolean };
   // ondragstart:  (event: DragEvent) => void | boolean;
@@ -78,20 +79,21 @@ export class DragAndDropEvent {
 
   constructor(el: Element,
               eventOptions: { [key: string]: DragAndDropEventOptions } = DragAndDropEvent.ALL_OPTIONS,
-              eventFilter?: (event: DragEvent) => boolean
+              interceptor?: (event: DragEvent) => boolean
   ) {
     this.el       = el;
     this.options  = eventOptions;
 
-    this.observable = this.initEvent(eventFilter);
+    this.observable = this.initEvent(interceptor);
   }
 
-  private initEvent(eventFilter?: (event: DragEvent) => boolean): Observable<DragEvent> {
+  private initEvent(interceptor?: (event: DragEvent) => boolean): Observable<DragEvent> {
     const observables = Object.getOwnPropertyNames(this.options)
       .reduce<Array<Observable<DragEvent>>>((previousValue, currentValue) => {
         const option = this.options[currentValue];
 
         let eventObservable = this.addEventListener(this.el, option);
+
         eventObservable = this.addListenFunction(eventObservable, option);
 
         previousValue.push(eventObservable);
@@ -115,11 +117,19 @@ export class DragAndDropEvent {
   }
 
   private addListenFunction(observable: Observable<DragEvent>, option: DragAndDropEventOptions): Observable<DragEvent> {
+    if (!option.listener) {
+      return observable;
+    }
     return observable.pipe(
       tap(option.listener)
     );
   }
 
+  /**
+   * 根据option设置Event对象上的方法或属性
+   * @param observable
+   * @param option
+   */
   private eventOptions(observable: Observable<DragEvent>, option: DragAndDropEventOptions): Observable<DragEvent> {
     return observable
       .pipe(
@@ -131,6 +141,11 @@ export class DragAndDropEvent {
       );
   }
 
+  /**
+   * 根据option对事件流进行option中设置操作
+   * @param observable
+   * @param option
+   */
   private streamOperator(observable: Observable<DragEvent>, option: DragAndDropEventOptions): Observable<DragEvent> {
     if (!option.operatorOptions) { return observable; }
     const operator = option.operatorOptions;

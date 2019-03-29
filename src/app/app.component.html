@@ -1,12 +1,7 @@
 <!--The content below is only a placeholder and can be replaced.-->
 <div class="main-container">
-  <div class="toolbar">
-    <button (click)="changeContent()">change content</button>
-    <button (click)="changeContentToNull()">change content to null</button>
-  </div>
   <nb-ngr2-markdown
-    [mode]="'edit'"
-    [options]="{TOC: true, toolBar: true, direction: 'left', bodyClassName: 'markdown-body', height: 'calc(100vh - 40px)', themeColor: '#3f51a5'}"
+    [options]="{TOC: true, toolBar: true, direction: 'left', bodyClassName: 'markdown-body', height: 'calc(100vh)', themeColor: '#3f51a5'}"
     [markdown]="content"
     class="markdown"
   ></nb-ngr2-markdown>

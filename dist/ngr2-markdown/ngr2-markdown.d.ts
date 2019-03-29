@@ -9,7 +9,6 @@ export { FileBrowserComponent as ɵf } from './lib/file-browser/file-browser.com
 export { MenuComponent as ɵi } from './lib/menu/menu.component';
 export { HTMLPipePipe as ɵb } from './lib/pipe/htmlpipe.pipe';
 export { MdPipe as ɵc } from './lib/pipe/md.pipe';
-export { DragAndDropService as ɵk } from './lib/service/drag-and-drop.service';
 export { SideTocComponent as ɵa } from './lib/side-toc/side-toc.component';
 export { StatusBarComponent as ɵg } from './lib/status-bar/status-bar.component';
 export { ToolBarComponent as ɵd } from './lib/tool-bar/tool-bar.component';

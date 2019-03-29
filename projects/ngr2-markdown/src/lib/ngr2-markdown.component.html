@@ -1,15 +1,16 @@
 <div class="main-panel"
      [style.height]="_options.height"
+     nbDragAndDrop
 >
   <nb-tool-bar class="tool-bar"
   ></nb-tool-bar>
   <div class="content-panel content-container"
        nbDragAndDrop
   >
-    <nb-file-browser class="file-browser"
+    <nb-file-browser class="file-browser-wrapper"
     >
     </nb-file-browser>
-    <nb-edit-box *ngIf="mode === 'edit'"
+    <nb-edit-box *ngIf="_options.mode === 'edit'"
                  [ngClass]="'editor'"
     >
     </nb-edit-box>

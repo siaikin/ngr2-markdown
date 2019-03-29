@@ -1,10 +1,10 @@
-import * as MarkdownIt from 'markdown-it/lib/index';
+import * as MarkdownIt from 'node_modules/markdown-it/dist/markdown-it.min.js';
 import { getLanguage, highlight } from 'highlight.js';
-import { __spread } from 'tslib';
-import { map, distinctUntilChanged, filter } from 'rxjs/operators';
 import { DomSanitizer, BrowserModule } from '@angular/platform-browser';
-import { Injectable, Component, Pipe, Input, ElementRef, ViewChild, Directive, HostBinding, HostListener, NgModule, defineInjectable, ViewEncapsulation } from '@angular/core';
-import { Observable, Subject, fromEvent, merge, BehaviorSubject } from 'rxjs';
+import { Injectable, Directive, ElementRef, Component, Pipe, Input, ViewChild, NgModule, Renderer2, defineInjectable, ViewEncapsulation } from '@angular/core';
+import { __spread } from 'tslib';
+import { Observable, fromEvent, merge, BehaviorSubject, Subject, concat } from 'rxjs';
+import { map, distinctUntilChanged, filter, debounceTime, mergeMap, scan, tap, throttleTime } from 'rxjs/operators';
 
 /**
  * @fileoverview added by tsickle
@@ -61,11 +61,23 @@ var MarkdownImpl = /** @class */ (function () {
         return html;
     };
     /**
+     * fn: 传入的方法可以对md的内容进行处理, 处理结果由subject发出
+     * fn.md: Markdown对象内容都在里面
+     * fm.subject: 观察者, 处理结果由此传出
+     * @param fn
+     */
+    /**
+     * fn: 传入的方法可以对md的内容进行处理, 处理结果由subject发出
+     * fn.md: Markdown对象内容都在里面
+     * fm.subject: 观察者, 处理结果由此传出
      * @template T
      * @param {?} fn
      * @return {?}
      */
     MarkdownImpl.prototype.use = /**
+     * fn: 传入的方法可以对md的内容进行处理, 处理结果由subject发出
+     * fn.md: Markdown对象内容都在里面
+     * fm.subject: 观察者, 处理结果由此传出
      * @template T
      * @param {?} fn
      * @return {?}
@@ -73,8 +85,6 @@ var MarkdownImpl = /** @class */ (function () {
     function (fn) {
         /** @type {?} */
         var md = this.markdownIt;
-        /** @type {?} */
-        var subject = new Subject();
         /** @type {?} */
         var observable = new Observable((/**
          * @param {?} subscriber
@@ -233,182 +243,98 @@ var FileOperatorImpl = /** @class */ (function () {
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
+var TextParser = /** @class */ (function () {
+    function TextParser() {
+    }
+    /**
+     * @private
+     * @param {?} text
+     * @return {?}
+     */
+    TextParser.parse = /**
+     * @private
+     * @param {?} text
+     * @return {?}
+     */
+    function (text) {
+        if (!text) {
+            return;
+        }
+        /** @type {?} */
+        var words = (text.match(TextParser.WORDS) || []).length;
+        /** @type {?} */
+        var bytes = 0;
+        /** @type {?} */
+        var lines = 0;
+        for (var i = 0; i < text.length; i++) {
+            if (text.charCodeAt(i) & 0xff00) {
+                bytes++;
+            }
+            else if (text.charAt(i) === '\n') {
+                lines++;
+            }
+            bytes++;
+        }
+        console.log({
+            words: words,
+            bytes: bytes,
+            lines: lines
+        });
+    };
+    /**
+     * @param {?} markdown
+     * @return {?}
+     */
+    TextParser.parseMD = /**
+     * @param {?} markdown
+     * @return {?}
+     */
+    function (markdown) {
+        this.parse(markdown);
+    };
+    /**
+     * @param {?} html
+     * @return {?}
+     */
+    TextParser.parseHTML = /**
+     * @param {?} html
+     * @return {?}
+     */
+    function (html) {
+        TextParser._DIV.innerHTML = html;
+        this.parse(TextParser._DIV.textContent);
+    };
+    TextParser._DIV = document.createElement('DIV');
+    TextParser.WORDS = new RegExp('/([a-zA-Z]+)|([\u4e00-\u9fa5])/g');
+    return TextParser;
+}());
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
 var Ngr2MarkdownService = /** @class */ (function () {
     function Ngr2MarkdownService() {
         var _this = this;
-        this.unitMap = {
-            exist: false,
-            child: {
-                'b': {
-                    exist: false,
-                    child: {
-                        'v': {
-                            exist: true,
-                            child: {}
-                        }
-                    }
-                },
-                'c': {
-                    exist: false,
-                    child: {
-                        'i': {
-                            exist: true,
-                            child: {}
-                        },
-                        'p': {
-                            exist: true,
-                            child: {}
-                        }
-                    }
-                },
-                'h': {
-                    exist: false,
-                    child: {
-                        'c': {
-                            exist: true,
-                            child: {}
-                        },
-                        'l': {
-                            exist: true,
-                            child: {
-                                'r': {
-                                    exist: true,
-                                    child: {}
-                                }
-                            }
-                        },
-                        'v': {
-                            exist: true,
-                            child: {}
-                        }
-                    }
-                },
-                'i': {
-                    exist: false,
-                    child: {
-                        'v': {
-                            exist: true,
-                            child: {}
-                        }
-                    }
-                },
-                'm': {
-                    exist: false,
-                    child: {
-                        'e': {
-                            exist: true,
-                            child: {
-                                'r': {
-                                    exist: true,
-                                    child: {}
-                                }
-                            }
-                        },
-                        'm': {
-                            exist: true,
-                            child: {}
-                        },
-                        'c': {
-                            exist: true,
-                            child: {}
-                        }
-                    }
-                },
-                'n': {
-                    exist: false,
-                    child: {
-                        'i': {
-                            exist: true,
-                            child: {
-                                'm': {
-                                    exist: false,
-                                    child: {
-                                        'v': {
-                                            exist: true,
-                                            child: {}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                'p': {
-                    exist: false,
-                    child: {
-                        'a': {
-                            exist: false,
-                            child: {
-                                'c': {
-                                    exist: true,
-                                    child: {}
-                                },
-                            }
-                        },
-                    }
-                },
-                'q': {
-                    exist: true,
-                    child: {}
-                },
-                't': {
-                    exist: false,
-                    child: {
-                        'p': {
-                            exist: true,
-                            child: {}
-                        }
-                    }
-                },
-                'w': {
-                    exist: false,
-                    child: {
-                        'v': {
-                            exist: true,
-                            child: {}
-                        }
-                    }
-                },
-                'x': {
-                    exist: false,
-                    child: {
-                        'a': {
-                            exist: false,
-                            child: {
-                                'm': {
-                                    exist: false,
-                                    child: {
-                                        'v': {
-                                            exist: true,
-                                            child: {}
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        'e': {
-                            exist: true,
-                            child: {}
-                        },
-                        'p': {
-                            exist: true,
-                            child: {}
-                        }
-                    }
-                }
-            }
-        };
+        /**
+         * 接收Markdown源文本
+         */
+        this.originMd = new BehaviorSubject(null);
+        this.resetMd = new BehaviorSubject(null);
         /**
          * 当前浏览的标题的Subject, BehaviorSubject可支持多播(在多处订阅)
          */
         this.currentHeading = new BehaviorSubject(null);
-        this.currentContent = new BehaviorSubject(null);
+        /**
+         * @deprecated
+         */
+        this.currentContent = new BehaviorSubject({ md: '', html: '' });
         /**
          * 发送目录信息的Subject
          */
         this.TOCInfo = new BehaviorSubject(null);
-        this.markdownIt = new MarkdownImpl();
-        this.markdownIt.use(this.anchor)
+        this._md = new MarkdownImpl();
+        this._md.use(this.anchor)
             .subscribe((/**
          * @param {?} value
          * @return {?}
@@ -436,7 +362,93 @@ var Ngr2MarkdownService = /** @class */ (function () {
             }
             _this.TOCInfo.next(root);
         }));
+        this.renderMd = this.originMd
+            .pipe(map((/**
+         * @param {?} mdText
+         * @return {?}
+         */
+        function (mdText) {
+            return {
+                md: mdText || null,
+                html: _this.render(mdText)
+            };
+        })));
+        this.resetMd
+            .subscribe(this.originMd);
     }
+    /**
+     * 重置markdown文本
+     * @param md
+     */
+    /**
+     * 重置markdown文本
+     * @param {?} md
+     * @return {?}
+     */
+    Ngr2MarkdownService.prototype.reinitialization = /**
+     * 重置markdown文本
+     * @param {?} md
+     * @return {?}
+     */
+    function (md) {
+        if (!md) {
+            return;
+        }
+        this.resetMd.next(md);
+    };
+    /**
+     * markdown文本重置后, 发出消息
+     */
+    /**
+     * markdown文本重置后, 发出消息
+     * @return {?}
+     */
+    Ngr2MarkdownService.prototype.observerResetMarkdown = /**
+     * markdown文本重置后, 发出消息
+     * @return {?}
+     */
+    function () {
+        return this.resetMd;
+    };
+    /**
+     * 更新markdown文本, 用于实时预览功能
+     * @param md
+     */
+    /**
+     * 更新markdown文本, 用于实时预览功能
+     * @param {?} md
+     * @return {?}
+     */
+    Ngr2MarkdownService.prototype.updateMarkdown = /**
+     * 更新markdown文本, 用于实时预览功能
+     * @param {?} md
+     * @return {?}
+     */
+    function (md) {
+        if (!md) {
+            return;
+        }
+        if (md instanceof Observable) {
+            md.subscribe(this.originMd);
+        }
+        else {
+            this.originMd.next(md);
+        }
+    };
+    /**
+     * markdown文本更新后, 发出消息
+     */
+    /**
+     * markdown文本更新后, 发出消息
+     * @return {?}
+     */
+    Ngr2MarkdownService.prototype.observeMarkdown = /**
+     * markdown文本更新后, 发出消息
+     * @return {?}
+     */
+    function () {
+        return this.renderMd;
+    };
     /**
      * @param {?} markdown
      * @param {?=} options
@@ -448,15 +460,13 @@ var Ngr2MarkdownService = /** @class */ (function () {
      * @return {?}
      */
     function (markdown, options) {
-        if (typeof markdown !== 'string') {
+        if (!markdown) {
             markdown = '';
         }
         /** @type {?} */
-        var html = this.markdownIt.render(markdown, options);
-        this.currentContent.next({
-            md: markdown,
-            html: html
-        });
+        var html = this._md.render(markdown, options);
+        TextParser.parseMD(markdown);
+        TextParser.parseHTML(html);
         return html;
     };
     /**
@@ -479,49 +489,6 @@ var Ngr2MarkdownService = /** @class */ (function () {
         }
     };
     /**
-     * @param {?} str
-     * @param {?=} unitMap
-     * @param {?=} caseSensitive
-     * @return {?}
-     */
-    Ngr2MarkdownService.prototype.checkUnit = /**
-     * @param {?} str
-     * @param {?=} unitMap
-     * @param {?=} caseSensitive
-     * @return {?}
-     */
-    function (str, unitMap, caseSensitive) {
-        if (unitMap === void 0) { unitMap = this.unitMap; }
-        if (!unitMap || !str) {
-            return;
-        }
-        if (!caseSensitive) {
-            str = str.toLocaleLowerCase();
-        }
-        /** @type {?} */
-        var i;
-        /** @type {?} */
-        var isMatch = false;
-        for (i = str.length - 1; i >= 0; i--) {
-            /** @type {?} */
-            var ascii = str.charCodeAt(i);
-            if (ascii >= 48 && ascii <= 57) {
-                isMatch = unitMap.exist;
-                break;
-            }
-            else {
-                if (!unitMap.child[str[i]]) {
-                    break;
-                }
-                unitMap = unitMap.child[str[i]];
-            }
-        }
-        return isMatch ? {
-            unit: str.substr(i + 1),
-            number: Number.parseInt(str.substr(0, i + 1), 10)
-        } : null;
-    };
-    /**
      * 将当前显示的内容转换成`data:`url
      * @param type - `markdown`/`html`: 要转换的内容
      */
@@ -538,17 +505,18 @@ var Ngr2MarkdownService = /** @class */ (function () {
     function (type) {
         /** @type {?} */
         var fileOperator = new FileOperatorImpl();
+        // 兼容ie11-10, ie10不支持File对象的构造函数, 无法新建File对象, 故使用Blob
         /** @type {?} */
         var file;
         switch (type) {
             case 'markdown':
-                file = new File([this.currentContent.getValue().md], 'markdown', { type: 'text/plain' });
+                file = new Blob([this.currentContent.getValue().md], { type: 'text/plain' });
                 break;
             case "html":
-                file = new File([this.currentContent.getValue().html], 'html', { type: 'text/html' });
+                file = new Blob([this.currentContent.getValue().html], { type: 'text/html' });
                 break;
             default:
-                file = new File(['null'], 'html', { type: 'text/html' });
+                file = new Blob(['null'], { type: 'text/html' });
                 break;
         }
         fileOperator.toDataURLSync(file);
@@ -583,7 +551,7 @@ var Ngr2MarkdownService = /** @class */ (function () {
          */
         function (state) {
             /** @type {?} */
-            var infoList = new Array();
+            var infoList = [];
             state.tokens.map((/**
              * @param {?} token
              * @param {?} index
@@ -612,15 +580,17 @@ var Ngr2MarkdownService = /** @class */ (function () {
     /** @nocollapse */ Ngr2MarkdownService.ngInjectableDef = defineInjectable({ factory: function Ngr2MarkdownService_Factory() { return new Ngr2MarkdownService(); }, token: Ngr2MarkdownService, providedIn: "root" });
     return Ngr2MarkdownService;
 }());
-var MarkdownOption$1 = /** @class */ (function () {
-    function MarkdownOption(anchor, TOC, toolBar, direction, height, themeColor, bodyClassName) {
-        if (anchor === void 0) { anchor = false; }
-        if (TOC === void 0) { TOC = false; }
-        if (toolBar === void 0) { toolBar = false; }
-        if (direction === void 0) { direction = 'left'; }
-        if (height === void 0) { height = '800px'; }
-        if (themeColor === void 0) { themeColor = '#3f51b5'; }
-        if (bodyClassName === void 0) { bodyClassName = 'markdown-body'; }
+var EditorOption = /** @class */ (function () {
+    function EditorOption(mode, anchor, TOC, toolBar, direction, height, themeColor, bodyClassName) {
+        if (mode === void 0) { mode = EditorOption.MODE; }
+        if (anchor === void 0) { anchor = EditorOption.ANCHOR; }
+        if (TOC === void 0) { TOC = EditorOption.TOc; }
+        if (toolBar === void 0) { toolBar = EditorOption.TOOL_BAR; }
+        if (direction === void 0) { direction = EditorOption.DIRECTION; }
+        if (height === void 0) { height = EditorOption.HEIGHT; }
+        if (themeColor === void 0) { themeColor = EditorOption.THEME_COLOR; }
+        if (bodyClassName === void 0) { bodyClassName = EditorOption.BODY_CLASS_NAME; }
+        this.mode = mode;
         this.anchor = anchor;
         this.TOC = TOC;
         this.toolBar = toolBar;
@@ -629,7 +599,26 @@ var MarkdownOption$1 = /** @class */ (function () {
         this.themeColor = themeColor;
         this.bodyClassName = bodyClassName;
     }
-    return MarkdownOption;
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    EditorOption.instanceOf = /**
+     * @param {?} value
+     * @return {?}
+     */
+    function (value) {
+        return new EditorOption(value.mode || EditorOption.MODE, value.anchor || EditorOption.ANCHOR, value.TOC || EditorOption.TOc, value.toolBar || EditorOption.TOOL_BAR, value.direction || EditorOption.DIRECTION, value.height || EditorOption.HEIGHT, value.themeColor || EditorOption.THEME_COLOR, value.bodyClassName || EditorOption.BODY_CLASS_NAME);
+    };
+    EditorOption.MODE = 'edit';
+    EditorOption.ANCHOR = false;
+    EditorOption.TOc = false;
+    EditorOption.TOOL_BAR = false;
+    EditorOption.DIRECTION = 'left';
+    EditorOption.HEIGHT = '800px';
+    EditorOption.THEME_COLOR = '#3f51b5';
+    EditorOption.BODY_CLASS_NAME = 'markdown-body';
+    return EditorOption;
 }());
 var TOCItem = /** @class */ (function () {
     function TOCItem(content, indentLevel) {
@@ -638,6 +627,221 @@ var TOCItem = /** @class */ (function () {
         this.children = new Array();
     }
     return TOCItem;
+}());
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+var ParseUnit = /** @class */ (function () {
+    function ParseUnit() {
+    }
+    /**
+     * @param {?} str
+     * @param {?=} unitMap
+     * @param {?=} caseSensitive
+     * @return {?}
+     */
+    ParseUnit.checkUnit = /**
+     * @param {?} str
+     * @param {?=} unitMap
+     * @param {?=} caseSensitive
+     * @return {?}
+     */
+    function (str, unitMap, caseSensitive) {
+        if (unitMap === void 0) { unitMap = ParseUnit.UNIT_MAP; }
+        if (!unitMap || !str) {
+            return;
+        }
+        if (!caseSensitive) {
+            str = str.toLocaleLowerCase();
+        }
+        /** @type {?} */
+        var i;
+        /** @type {?} */
+        var isMatch = false;
+        for (i = str.length - 1; i >= 0; i--) {
+            /** @type {?} */
+            var ascii = str.charCodeAt(i);
+            if (ascii >= 48 && ascii <= 57) {
+                isMatch = unitMap.exist;
+                break;
+            }
+            else {
+                if (!unitMap.child[str[i]]) {
+                    break;
+                }
+                unitMap = unitMap.child[str[i]];
+            }
+        }
+        return isMatch ? {
+            unit: str.substr(i + 1),
+            number: Number.parseInt(str.substr(0, i + 1), 10)
+        } : null;
+    };
+    ParseUnit.UNIT_MAP = {
+        exist: false,
+        child: {
+            'b': {
+                exist: false,
+                child: {
+                    'v': {
+                        exist: true,
+                        child: {}
+                    }
+                }
+            },
+            'c': {
+                exist: false,
+                child: {
+                    'i': {
+                        exist: true,
+                        child: {}
+                    },
+                    'p': {
+                        exist: true,
+                        child: {}
+                    }
+                }
+            },
+            'h': {
+                exist: false,
+                child: {
+                    'c': {
+                        exist: true,
+                        child: {}
+                    },
+                    'l': {
+                        exist: true,
+                        child: {
+                            'r': {
+                                exist: true,
+                                child: {}
+                            }
+                        }
+                    },
+                    'v': {
+                        exist: true,
+                        child: {}
+                    }
+                }
+            },
+            'i': {
+                exist: false,
+                child: {
+                    'v': {
+                        exist: true,
+                        child: {}
+                    }
+                }
+            },
+            'm': {
+                exist: false,
+                child: {
+                    'e': {
+                        exist: true,
+                        child: {
+                            'r': {
+                                exist: true,
+                                child: {}
+                            }
+                        }
+                    },
+                    'm': {
+                        exist: true,
+                        child: {}
+                    },
+                    'c': {
+                        exist: true,
+                        child: {}
+                    }
+                }
+            },
+            'n': {
+                exist: false,
+                child: {
+                    'i': {
+                        exist: true,
+                        child: {
+                            'm': {
+                                exist: false,
+                                child: {
+                                    'v': {
+                                        exist: true,
+                                        child: {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            'p': {
+                exist: false,
+                child: {
+                    'a': {
+                        exist: false,
+                        child: {
+                            'c': {
+                                exist: true,
+                                child: {}
+                            },
+                        }
+                    },
+                }
+            },
+            'q': {
+                exist: true,
+                child: {}
+            },
+            't': {
+                exist: false,
+                child: {
+                    'p': {
+                        exist: true,
+                        child: {}
+                    }
+                }
+            },
+            'w': {
+                exist: false,
+                child: {
+                    'v': {
+                        exist: true,
+                        child: {}
+                    }
+                }
+            },
+            'x': {
+                exist: false,
+                child: {
+                    'a': {
+                        exist: false,
+                        child: {
+                            'm': {
+                                exist: false,
+                                child: {
+                                    'v': {
+                                        exist: true,
+                                        child: {}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    'e': {
+                        exist: true,
+                        child: {}
+                    },
+                    'p': {
+                        exist: true,
+                        child: {}
+                    }
+                }
+            }
+        }
+    };
+    return ParseUnit;
 }());
 
 /**
@@ -654,17 +858,7 @@ var Ngr2MarkdownComponent = /** @class */ (function () {
          * @return {?}
          */
         function (value) {
-            var _this = this;
-            // 渲染出html
-            this._html = this.markdownService.render(value);
-            // 重新初始化一些需要视图渲染结束才能获取的对象的值
-            this.reinitialization();
-            setTimeout((/**
-             * @return {?}
-             */
-            function () {
-                _this.updateHeadingInfo();
-            }));
+            this.markdownService.updateMarkdown(value);
         },
         enumerable: true,
         configurable: true
@@ -675,7 +869,7 @@ var Ngr2MarkdownComponent = /** @class */ (function () {
          * @return {?}
          */
         function (value) {
-            this._options = value;
+            this._options = EditorOption.instanceOf(value);
         },
         enumerable: true,
         configurable: true
@@ -688,6 +882,23 @@ var Ngr2MarkdownComponent = /** @class */ (function () {
      */
     function () {
         var _this = this;
+        this.markdownService.observeMarkdown()
+            .subscribe((/**
+         * @param {?} value
+         * @return {?}
+         */
+        function (value) {
+            // 更新innerHTML
+            _this._html = value.html;
+            // 重新初始化一些需要视图渲染结束才能获取的对象的值
+            _this.reinitialization();
+            setTimeout((/**
+             * @return {?}
+             */
+            function () {
+                _this.updateHeadingInfo();
+            }));
+        }));
         fromEvent(this.markdownBody.nativeElement, 'scroll')
             .pipe(filter((/**
          * @return {?}
@@ -707,7 +918,7 @@ var Ngr2MarkdownComponent = /** @class */ (function () {
     function () {
         this.headingElementMarginTop = {};
         // 初始化标题元素的数组
-        this.headingElementRef = new Array();
+        this.headingElementRef = [];
         // 页面滚动到顶部
         this.markdownBody.nativeElement.scrollTop = 0;
         // 重置当前标题
@@ -792,26 +1003,26 @@ var Ngr2MarkdownComponent = /** @class */ (function () {
      * @return {?}
      */
     function () {
-        var _this = this;
         var _a;
         /** @type {?} */
-        var nodeList = this.markdownBody.nativeElement.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        var nodeList = ((/** @type {?} */ (this.markdownBody.nativeElement))).querySelectorAll('h1, h2');
         if (nodeList === undefined || nodeList === null) {
             return;
         }
         this.headingElementRef.splice(0);
-        // Element.style.xxx只能读取行内样式
-        nodeList.forEach((/**
-         * @param {?} value
-         * @return {?}
-         */
-        function (value) {
+        /** @type {?} */
+        var nodes = [];
+        for (var i = 0; i < nodeList.length; i++) {
+            /** @type {?} */
+            var value = (/** @type {?} */ (nodeList[i]));
             // 提取element的样式
             /** @type {?} */
-            var marginTop = _this.getComputedStyle(value, 'margin-top');
-            _this.headingElementMarginTop[value.id] = _this.markdownService.checkUnit(marginTop).number;
-        }));
-        (_a = this.headingElementRef).push.apply(_a, __spread(nodeList));
+            var marginTop = this.getComputedStyle(value, 'margin-top');
+            this.headingElementMarginTop[value.id] = ParseUnit.checkUnit(marginTop).number;
+            nodes.push(value);
+        }
+        // Element.style.xxx只能读取行内样式
+        (_a = this.headingElementRef).push.apply(_a, __spread(nodes));
     };
     /**
      * @param {?} element
@@ -831,9 +1042,9 @@ var Ngr2MarkdownComponent = /** @class */ (function () {
     Ngr2MarkdownComponent.decorators = [
         { type: Component, args: [{
                     selector: 'nb-ngr2-markdown',
-                    template: "<div class=\"main-panel\"\n     [style.height]=\"_options.height\"\n>\n  <nb-tool-bar class=\"tool-bar\"\n               nbDragAndDrop\n               [droppable]=\"true\"\n  ></nb-tool-bar>\n  <div class=\"content-panel content-container\">\n    <nb-file-browser class=\"file-browser\"></nb-file-browser>\n    <nb-edit-box *ngIf=\"mode === 'edit'\"\n                 [ngClass]=\"'editor'\"\n    >\n    </nb-edit-box>\n    <nb-control-bar class=\"control-bar\"></nb-control-bar>\n    <article #markdownBody\n             [ngClass]=\"[_options.bodyClassName]\"\n             [innerHTML]=\"_html | safe:'html'\"\n    >\n    </article>\n    <nb-menu class=\"menu\"></nb-menu>\n  </div>\n  <nb-status-bar class=\"status-bar\" nbDragAndDrop [droppable]=\"true\"></nb-status-bar>\n</div>\n",
+                    template: "<div class=\"main-panel\"\r\n     [style.height]=\"_options.height\"\r\n     nbDragAndDrop\r\n>\r\n  <nb-tool-bar class=\"tool-bar\"\r\n  ></nb-tool-bar>\r\n  <div class=\"content-panel content-container\"\r\n       nbDragAndDrop\r\n  >\r\n    <nb-file-browser class=\"file-browser-wrapper\"\r\n    >\r\n    </nb-file-browser>\r\n    <nb-edit-box *ngIf=\"_options.mode === 'edit'\"\r\n                 [ngClass]=\"'editor'\"\r\n    >\r\n    </nb-edit-box>\r\n    <nb-control-bar class=\"control-bar\"\r\n    >\r\n    </nb-control-bar>\r\n    <article #markdownBody\r\n             [ngClass]=\"[_options.bodyClassName]\"\r\n             [innerHTML]=\"_html | safe:'html'\"\r\n    >\r\n    </article>\r\n    <nb-menu class=\"menu\"\r\n    >\r\n    </nb-menu>\r\n  </div>\r\n  <nb-status-bar class=\"status-bar\"\r\n  ></nb-status-bar>\r\n</div>\r\n",
                     encapsulation: ViewEncapsulation.None,
-                    styles: [".main-panel{position:relative;display:flex;flex-direction:column;flex:1 1 auto;box-sizing:border-box;padding:15px}.markdown-body{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;padding:45px;min-width:200px;height:100%}.editor{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;padding:5px;min-width:200px;height:100%}.content-container{display:flex;flex-direction:row}.side-toc-container{flex:0 auto;max-width:200px}.tool-bar{flex:0 0 25px;background-color:#d3d3d3}.content-panel{flex:1 1 auto;background-color:#a9a9a9}.status-bar{flex:0 0 15px;background-color:gray}.file-browser{flex:0 0 200px;background-color:#696969}.control-bar{flex:0 0 15px;background-color:#faebd7}.menu{flex:0 0 200px;background-color:#778899}"]
+                    styles: [".main-panel{position:relative;display:flex;flex-direction:column;flex:1 1 auto;box-sizing:border-box}.markdown-body{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;padding:45px;min-width:200px;height:100%}.editor{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;min-width:200px;height:auto;display:flex;flex-direction:column}.content-container{display:flex;flex-direction:row}.side-toc-container{flex:0 auto;max-width:200px}.tool-bar{flex:0 0 25px;background-color:#d3d3d3}.content-panel{flex:1 1 auto;background-color:#a9a9a9}.status-bar{flex:0 0 15px;background-color:gray}.file-browser-wrapper{flex:0 0 200px;background-color:#696969}.control-bar{overflow:auto;flex:0 0 25px;background-color:#faebd7}.menu{flex:0 0 200px;background-color:#778899}"]
                 }] }
     ];
     /** @nocollapse */
@@ -845,8 +1056,7 @@ var Ngr2MarkdownComponent = /** @class */ (function () {
                         read: ElementRef
                     },] }],
         markdown: [{ type: Input }],
-        options: [{ type: Input }],
-        mode: [{ type: Input }]
+        options: [{ type: Input }]
     };
     return Ngr2MarkdownComponent;
 }());
@@ -890,7 +1100,7 @@ var SideTocComponent = /** @class */ (function () {
     SideTocComponent.decorators = [
         { type: Component, args: [{
                     selector: 'nb-side-toc',
-                    template: "<aside class=\"side-anchor-toc\">\n  <ol class=\"nav\">\n    <li *ngFor=\"let TOCItem of TOCInfo.children\"\n        [ngClass]=\"['item-level-' + TOCItem.indentLevel, 'nav-item', 'nav-item-active']\"\n    >\n      <a [href]=\"'#' + TOCItem.content\"\n         [ngClass]=\"['nav-item-link']\"\n         [ngStyle]=\"{'color': TOCItem.content === currentHeading ? themeColor : ''}\"\n      >\n        <span>{{ TOCItem.content }}</span>\n      </a>\n      <ol class=\"nav\">\n        <li *ngFor=\"let subItem of TOCItem.children\"\n            [ngClass]=\"['item-level-' + subItem.indentLevel, 'nav-item', 'nav-item-active']\"\n        >\n          <a [href]=\"'#' + subItem.content\"\n             [ngClass]=\"['nav-item-link']\"\n             [ngStyle]=\"{'color': subItem.content === currentHeading ? themeColor : ''}\"\n          >\n            <span>{{ subItem.content }}</span>\n          </a>\n        </li>\n      </ol>\n    </li>\n  </ol>\n</aside>\n",
+                    template: "<aside class=\"side-anchor-toc\">\r\n  <ol class=\"nav\">\r\n    <li *ngFor=\"let TOCItem of TOCInfo.children\"\r\n        [ngClass]=\"['item-level-' + TOCItem.indentLevel, 'nav-item', 'nav-item-active']\"\r\n    >\r\n      <a [href]=\"'#' + TOCItem.content\"\r\n         [ngClass]=\"['nav-item-link']\"\r\n         [ngStyle]=\"{'color': TOCItem.content === currentHeading ? themeColor : ''}\"\r\n      >\r\n        <span>{{ TOCItem.content }}</span>\r\n      </a>\r\n      <ol class=\"nav\">\r\n        <li *ngFor=\"let subItem of TOCItem.children\"\r\n            [ngClass]=\"['item-level-' + subItem.indentLevel, 'nav-item', 'nav-item-active']\"\r\n        >\r\n          <a [href]=\"'#' + subItem.content\"\r\n             [ngClass]=\"['nav-item-link']\"\r\n             [ngStyle]=\"{'color': subItem.content === currentHeading ? themeColor : ''}\"\r\n          >\r\n            <span>{{ subItem.content }}</span>\r\n          </a>\r\n        </li>\r\n      </ol>\r\n    </li>\r\n  </ol>\r\n</aside>\r\n",
                     styles: [".side-anchor-toc{display:flex;flex-direction:column;font-size:14px;margin:0 auto;padding:10px;color:gray}.side-anchor-toc a{color:#696969}.nav{margin:0}.nav-item{line-height:1.8;cursor:pointer}.nav-item-link{text-decoration:none;outline:0}"]
                 }] }
     ];
@@ -1052,7 +1262,7 @@ var ToolBarComponent = /** @class */ (function () {
     ToolBarComponent.decorators = [
         { type: Component, args: [{
                     selector: 'nb-tool-bar',
-                    template: "<a [download]=\"title + '.md'\"\n   [href]=\"mdHref | safe:'url'\"\n>\n  MD\n</a>\n<a [download]=\"title + '.html'\"\n   [href]=\"htmlHref | safe:'url'\"\n>\n  HTML\n</a>\n",
+                    template: "<a [download]=\"title + '.md'\"\r\n   [href]=\"mdHref | safe:'url'\"\r\n>\r\n  MD\r\n</a>\r\n<a [download]=\"title + '.html'\"\r\n   [href]=\"htmlHref | safe:'url'\"\r\n>\r\n  HTML\r\n</a>\r\n",
                     styles: ["a{color:gray;text-decoration:none}"]
                 }] }
     ];
@@ -1071,7 +1281,10 @@ var ToolBarComponent = /** @class */ (function () {
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
 var EditBoxComponent = /** @class */ (function () {
-    function EditBoxComponent() {
+    function EditBoxComponent(markdownService, el) {
+        this.markdownService = markdownService;
+        this.mdSubject = new Subject();
+        this._el = el.nativeElement;
     }
     /**
      * @return {?}
@@ -1080,16 +1293,119 @@ var EditBoxComponent = /** @class */ (function () {
      * @return {?}
      */
     function () {
+        var _this = this;
+        this._editArea = this._el.querySelector('#editArea');
+        // const sk = new ShortcutKeyEvent(this._editArea);
+        // sk.copy()
+        //   .subscribe(value => console.log(value));
+        this.markdownService.observerResetMarkdown()
+            .subscribe((/**
+         * @param {?} md
+         * @return {?}
+         */
+        function (md) {
+            _this._editArea.innerText = md;
+        }));
+        this.bindMdService();
+        this.bindMutationObserver();
+    };
+    /**
+     * 订阅MarkdownService的一些Subject/Observable
+     */
+    /**
+     * 订阅MarkdownService的一些Subject/Observable
+     * @private
+     * @return {?}
+     */
+    EditBoxComponent.prototype.bindMdService = /**
+     * 订阅MarkdownService的一些Subject/Observable
+     * @private
+     * @return {?}
+     */
+    function () {
+        var _this = this;
+        this.markdownService.observerResetMarkdown()
+            .subscribe((/**
+         * @param {?} md
+         * @return {?}
+         */
+        function (md) {
+            _this._editArea.textContent = md;
+        }));
+        this.markdownService
+            .updateMarkdown(this.observeText(200));
+    };
+    /**
+     * @private
+     * @param {?=} time
+     * @return {?}
+     */
+    EditBoxComponent.prototype.observeText = /**
+     * @private
+     * @param {?=} time
+     * @return {?}
+     */
+    function (time) {
+        if (!time) {
+            return this.mdSubject.asObservable();
+        }
+        return this.mdSubject
+            .pipe(distinctUntilChanged(), debounceTime(time));
+    };
+    /**
+     * 绑定并开启MutationObserver, 触发时将markdown文本发送到`mdSubject`
+     */
+    /**
+     * 绑定并开启MutationObserver, 触发时将markdown文本发送到`mdSubject`
+     * @private
+     * @return {?}
+     */
+    EditBoxComponent.prototype.bindMutationObserver = /**
+     * 绑定并开启MutationObserver, 触发时将markdown文本发送到`mdSubject`
+     * @private
+     * @return {?}
+     */
+    function () {
+        var _this = this;
+        /** @type {?} */
+        var _observer = new MutationObserver((/**
+         * @param {?} mutations
+         * @param {?} observer
+         * @return {?}
+         */
+        function (mutations, observer) {
+            _this.mdSubject.next(_this.getText());
+        }));
+        _observer.observe(this._editArea, {
+            subtree: true,
+            childList: true,
+            characterData: true,
+            characterDataOldValue: true
+        });
+    };
+    /**
+     * @private
+     * @return {?}
+     */
+    EditBoxComponent.prototype.getText = /**
+     * @private
+     * @return {?}
+     */
+    function () {
+        return this._editArea.innerText;
     };
     EditBoxComponent.decorators = [
         { type: Component, args: [{
                     selector: 'nb-edit-box',
-                    template: "<div class=\"edit-box\"\n>\n  <!-- tool bar -->\n  <!-- \u5DE5\u5177\u680F \u6269\u5C55\u7528 -->\n  <div class=\"edit-tool-bar\"\n  >\n  </div>\n  <!-- edit content -->\n  <!-- \u7F16\u8F91\u6846 -->\n  <div class=\"edit-content\"\n       contenteditable=\"true\"\n  >\n  </div>\n</div>\n",
-                    styles: [".edit-box{display:flex;flex-direction:column;height:100%}.edit-tool-bar{flex:0 0 25px}.edit-content{overflow-y:auto;overflow-wrap:break-word;flex:auto;outline:0;border:1px solid gray;padding:8px}"]
+                    template: "<div class=\"edit-box\"\r\n>\r\n  <!-- tool bar -->\r\n  <!-- \u5DE5\u5177\u680F \u6269\u5C55\u7528 -->\r\n  <div class=\"edit-tool-bar\"\r\n  >\r\n    edit tool bar\r\n  </div>\r\n  <!-- edit content -->\r\n  <!-- \u7F16\u8F91\u6846 -->\r\n  <div id=\"editArea\"\r\n       class=\"edit-content\"\r\n       contenteditable=\"true\"\r\n  >\r\n  </div>\r\n</div>\r\n",
+                    styles: [".edit-box{display:flex;flex-direction:column;height:100%}.edit-tool-bar{flex:0 0 25px}.edit-content{flex:auto;overflow:auto;overflow-wrap:break-word;outline:0;padding:20px;background-color:#fff}"]
                 }] }
     ];
     /** @nocollapse */
-    EditBoxComponent.ctorParameters = function () { return []; };
+    EditBoxComponent.ctorParameters = function () { return [
+        { type: Ngr2MarkdownService },
+        { type: ElementRef }
+    ]; };
     return EditBoxComponent;
 }());
 
@@ -1097,8 +1413,704 @@ var EditBoxComponent = /** @class */ (function () {
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
+// @dynamic
+var IndexedDB = /** @class */ (function () {
+    function IndexedDB(dbName, objectStoreStructs, subscriber) {
+        if (dbName === void 0) { dbName = 'testDB'; }
+        if (objectStoreStructs === void 0) { objectStoreStructs = IndexedDB.O_S_STRUCT; }
+        var _this = this;
+        this.objectStoreStructs = objectStoreStructs;
+        /** @type {?} */
+        var request = window.indexedDB.open(dbName);
+        request.onerror = (/**
+         * @param {?} event
+         * @return {?}
+         */
+        function (event) {
+            alert('Database error: ' + ((/** @type {?} */ (event.target))).error);
+        });
+        request.onsuccess = (/**
+         * @param {?} event
+         * @return {?}
+         */
+        function (event) {
+            console.log("IndexedDB open success");
+            _this._db = request.result;
+            subscriber.next(_this);
+        });
+        /**
+         * use to initial database
+         * @param event
+         */
+        request.onupgradeneeded = (/**
+         * @param {?} event
+         * @return {?}
+         */
+        function (event) {
+            console.log("IndexedDB upgrade need");
+            _this._db = request.result;
+            _this.objectStoreStructs.forEach((/**
+             * @param {?} store
+             * @return {?}
+             */
+            function (store) {
+                /** @type {?} */
+                var objectStore = _this._db.createObjectStore(store.name, store.optionalParameters);
+                if (store.indexes) {
+                    store.indexes.forEach((/**
+                     * @param {?} index
+                     * @return {?}
+                     */
+                    function (index) {
+                        objectStore.createIndex(index.name, index.keyPath || index.name, index.options);
+                    }));
+                }
+            }));
+        });
+    }
+    /**
+     * @param {?=} dbName
+     * @param {?=} objectStoreStructs
+     * @return {?}
+     */
+    IndexedDB.instenceof = /**
+     * @param {?=} dbName
+     * @param {?=} objectStoreStructs
+     * @return {?}
+     */
+    function (dbName, objectStoreStructs) {
+        if (dbName === void 0) { dbName = 'testDB'; }
+        if (objectStoreStructs === void 0) { objectStoreStructs = IndexedDB.O_S_STRUCT; }
+        return new Observable((/**
+         * @param {?} subscriber
+         * @return {?}
+         */
+        function (subscriber) {
+            /** @type {?} */
+            var indexedDB = new IndexedDB(dbName, objectStoreStructs, subscriber);
+        }));
+    };
+    /**
+     * get object store specify name and mode
+     * @param storeName
+     * @param mode
+     */
+    /**
+     * get object store specify name and mode
+     * @param {?} storeName
+     * @param {?} mode
+     * @return {?}
+     */
+    IndexedDB.prototype.getObjectStore = /**
+     * get object store specify name and mode
+     * @param {?} storeName
+     * @param {?} mode
+     * @return {?}
+     */
+    function (storeName, mode) {
+        return new IndexedDBStore(this._db.transaction(storeName, mode).objectStore(storeName));
+    };
+    IndexedDB.O_S_STRUCT = [
+        {
+            name: 'testStore',
+            optionalParameters: {
+                keyPath: 'id'
+            },
+            indexes: [
+                {
+                    name: 'storeName',
+                    keyPath: 'storeName',
+                    options: {
+                        unique: false
+                    }
+                }
+            ]
+        }
+    ];
+    return IndexedDB;
+}());
+var IndexedDBStore = /** @class */ (function () {
+    function IndexedDBStore(objectStore) {
+        this.objectStore = objectStore;
+    }
+    /**
+     * @template T
+     * @param {?} data
+     * @return {?}
+     */
+    IndexedDBStore.prototype.add = /**
+     * @template T
+     * @param {?} data
+     * @return {?}
+     */
+    function (data) {
+        var _this = this;
+        return new Observable((/**
+         * @param {?} subscriber
+         * @return {?}
+         */
+        function (subscriber) {
+            /** @type {?} */
+            var request = _this.objectStore.add(data);
+            _this.initRequest(request, subscriber);
+        }));
+    };
+    /**
+     * return Observable object send IndexedDBEvent multiple time
+     * @param data - add to store object array
+     */
+    /**
+     * return Observable object send IndexedDBEvent multiple time
+     * @template T
+     * @param {?} data - add to store object array
+     * @return {?}
+     */
+    IndexedDBStore.prototype.addAll = /**
+     * return Observable object send IndexedDBEvent multiple time
+     * @template T
+     * @param {?} data - add to store object array
+     * @return {?}
+     */
+    function (data) {
+        var _this = this;
+        /** @type {?} */
+        var addObservables = data.map((/**
+         * @param {?} item
+         * @return {?}
+         */
+        function (item) { return _this.add(item); }));
+        return this._concat_scan.apply(this, __spread(addObservables));
+    };
+    /**
+     * return Observable object send IndexedDBEvent
+     * if IndexedDBEvent.type is IndexedDBEventType.SUCCESS then get data from IndexedDBEvent.data
+     * @param key
+     */
+    /**
+     * return Observable object send IndexedDBEvent
+     * if IndexedDBEvent.type is IndexedDBEventType.SUCCESS then get data from IndexedDBEvent.data
+     * @template T
+     * @param {?} key
+     * @return {?}
+     */
+    IndexedDBStore.prototype.getById = /**
+     * return Observable object send IndexedDBEvent
+     * if IndexedDBEvent.type is IndexedDBEventType.SUCCESS then get data from IndexedDBEvent.data
+     * @template T
+     * @param {?} key
+     * @return {?}
+     */
+    function (key) {
+        var _this = this;
+        return new Observable((/**
+         * @param {?} subscriber
+         * @return {?}
+         */
+        function (subscriber) {
+            /** @type {?} */
+            var request = _this.objectStore.get(key);
+            _this.initRequest(request, subscriber);
+        }));
+    };
+    /**
+     * 兼容ie11-10, ie10不支持IndexedDB.getAll()方法, 用openCursor替代
+     * [IndexedDB.IDBObjectStore]{@link https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore}
+     */
+    /**
+     * 兼容ie11-10, ie10不支持IndexedDB.getAll()方法, 用openCursor替代
+     * [IndexedDB.IDBObjectStore]{\@link https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore}
+     * @template T
+     * @return {?}
+     */
+    IndexedDBStore.prototype.getAll = /**
+     * 兼容ie11-10, ie10不支持IndexedDB.getAll()方法, 用openCursor替代
+     * [IndexedDB.IDBObjectStore]{\@link https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore}
+     * @template T
+     * @return {?}
+     */
+    function () {
+        var _this = this;
+        /** @type {?} */
+        var observable = new Observable((/**
+         * @param {?} subscriber
+         * @return {?}
+         */
+        function (subscriber) {
+            /** @type {?} */
+            var request = _this.objectStore.openCursor();
+            request.onsuccess = (/**
+             * @param {?} event
+             * @return {?}
+             */
+            function (event) {
+                /** @type {?} */
+                var cursor = request.result;
+                if (cursor) {
+                    subscriber.next(new IndexedDBEvent(IndexedDBEventType.COMPLETE, 1, 1, cursor.value));
+                    cursor.continue();
+                }
+                else {
+                    subscriber.complete();
+                }
+            });
+            request.onerror = (/**
+             * @param {?} event
+             * @return {?}
+             */
+            function (event) {
+                subscriber.next(new IndexedDBEvent(IndexedDBEventType.ERROR, 0, 0));
+                subscriber.complete();
+            });
+            // this.initRequest<Array<T>>(request, subscriber);
+        }));
+        return this.getCount()
+            .pipe(mergeMap((/**
+         * @param {?} value
+         * @return {?}
+         */
+        function (value) { return _this._from_scan(observable, value.data); })));
+    };
+    /**
+     * return Observable object will send IndexedDBEvent multiple time
+     * will add T to IndexedDBEvent.data every time
+     * @param keys - ids
+     */
+    /**
+     * return Observable object will send IndexedDBEvent multiple time
+     * will add T to IndexedDBEvent.data every time
+     * @template T
+     * @param {...?} keys - ids
+     * @return {?}
+     */
+    IndexedDBStore.prototype.getAllById = /**
+     * return Observable object will send IndexedDBEvent multiple time
+     * will add T to IndexedDBEvent.data every time
+     * @template T
+     * @param {...?} keys - ids
+     * @return {?}
+     */
+    function () {
+        var _this = this;
+        var keys = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            keys[_i] = arguments[_i];
+        }
+        /** @type {?} */
+        var getObservables = keys.map((/**
+         * @param {?} item
+         * @return {?}
+         */
+        function (item) { return _this.getById(item); }));
+        return this._concat_scan.apply(this, __spread(getObservables));
+    };
+    /**
+     * like getAllById but parameter type is IDBIndex
+     * @param indexName - index name
+     */
+    /**
+     * like getAllById but parameter type is IDBIndex
+     * @template T
+     * @param {?} indexName - index name
+     * @return {?}
+     */
+    IndexedDBStore.prototype.getAllByIndex = /**
+     * like getAllById but parameter type is IDBIndex
+     * @template T
+     * @param {?} indexName - index name
+     * @return {?}
+     */
+    function (indexName) {
+        var _this = this;
+        /** @type {?} */
+        var index = this.objectStore.index(indexName);
+        /** @type {?} */
+        var observable = new Observable((/**
+         * @param {?} subscriber
+         * @return {?}
+         */
+        function (subscriber) {
+            /** @type {?} */
+            var request = index.openCursor();
+            request.onsuccess = (/**
+             * @param {?} event
+             * @return {?}
+             */
+            function (event) {
+                /** @type {?} */
+                var cursor = request.result;
+                if (cursor) {
+                    subscriber.next(new IndexedDBEvent(IndexedDBEventType.COMPLETE, 1, 1, (/** @type {?} */ (cursor.value))));
+                    cursor.continue();
+                }
+                else {
+                    subscriber.complete();
+                }
+            });
+            request.onerror = (/**
+             * @param {?} event
+             * @return {?}
+             */
+            function (event) {
+                subscriber.next(new IndexedDBEvent(IndexedDBEventType.ERROR, 0, 0));
+                subscriber.complete();
+            });
+        }));
+        return this.getCount(index)
+            .pipe(mergeMap((/**
+         * @param {?} value
+         * @return {?}
+         */
+        function (value) { return _this._from_scan(observable, value.data); })));
+    };
+    /**
+     * return observable object send IndexedDBEvent
+     * if success IndexedDBEvent.data is updated object primary key
+     * @param data
+     */
+    /**
+     * return observable object send IndexedDBEvent
+     * if success IndexedDBEvent.data is updated object primary key
+     * @template T
+     * @param {?} data
+     * @return {?}
+     */
+    IndexedDBStore.prototype.update = /**
+     * return observable object send IndexedDBEvent
+     * if success IndexedDBEvent.data is updated object primary key
+     * @template T
+     * @param {?} data
+     * @return {?}
+     */
+    function (data) {
+        var _this = this;
+        return new Observable((/**
+         * @param {?} subscriber
+         * @return {?}
+         */
+        function (subscriber) {
+            /** @type {?} */
+            var request = _this.objectStore.put(data);
+            _this.initRequest(request, subscriber);
+        }));
+    };
+    /**
+     * return observable object send IndexedDBEvent multiple time
+     * every time will add success updated object primary key to IndexedDBEvent.data
+     * @param data
+     */
+    /**
+     * return observable object send IndexedDBEvent multiple time
+     * every time will add success updated object primary key to IndexedDBEvent.data
+     * @template T
+     * @param {?} data
+     * @return {?}
+     */
+    IndexedDBStore.prototype.updateAll = /**
+     * return observable object send IndexedDBEvent multiple time
+     * every time will add success updated object primary key to IndexedDBEvent.data
+     * @template T
+     * @param {?} data
+     * @return {?}
+     */
+    function (data) {
+        var _this = this;
+        /** @type {?} */
+        var updateObservables = data.map((/**
+         * @param {?} item
+         * @return {?}
+         */
+        function (item) { return _this.update(item); }));
+        return this._concat_scan.apply(this, __spread(updateObservables));
+    };
+    /**
+     * delete
+     * if success return IndexedDBEvent.data type is undefined
+     * @param key
+     */
+    /**
+     * delete
+     * if success return IndexedDBEvent.data type is undefined
+     * @param {?} key
+     * @return {?}
+     */
+    IndexedDBStore.prototype.delete = /**
+     * delete
+     * if success return IndexedDBEvent.data type is undefined
+     * @param {?} key
+     * @return {?}
+     */
+    function (key) {
+        var _this = this;
+        return new Observable((/**
+         * @param {?} subscriber
+         * @return {?}
+         */
+        function (subscriber) {
+            /** @type {?} */
+            var request = _this.objectStore.delete(key);
+            _this.initRequest(request, subscriber);
+        }));
+    };
+    /**
+     * @param {...?} keys
+     * @return {?}
+     */
+    IndexedDBStore.prototype.deleteAll = /**
+     * @param {...?} keys
+     * @return {?}
+     */
+    function () {
+        var _this = this;
+        var keys = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            keys[_i] = arguments[_i];
+        }
+        /** @type {?} */
+        var deleteObservables = keys.map((/**
+         * @param {?} item
+         * @return {?}
+         */
+        function (item) { return _this.delete(item); }));
+        return this._concat_scan.apply(this, __spread(deleteObservables));
+    };
+    /**
+     * return observable object send IndexedDBEvent, IndexedDBEvent.data is IDBObjectStore or IDBIndex contain element's count
+     * @param object
+     * @param key
+     */
+    /**
+     * return observable object send IndexedDBEvent, IndexedDBEvent.data is IDBObjectStore or IDBIndex contain element's count
+     * @param {?=} object
+     * @param {?=} key
+     * @return {?}
+     */
+    IndexedDBStore.prototype.getCount = /**
+     * return observable object send IndexedDBEvent, IndexedDBEvent.data is IDBObjectStore or IDBIndex contain element's count
+     * @param {?=} object
+     * @param {?=} key
+     * @return {?}
+     */
+    function (object, key) {
+        var _this = this;
+        return new Observable((/**
+         * @param {?} subscriber
+         * @return {?}
+         */
+        function (subscriber) {
+            /** @type {?} */
+            var request = object === undefined ? _this.objectStore.count() : object.count();
+            _this.initRequest(request, subscriber);
+        }));
+    };
+    /**
+     * @private
+     * @template T
+     * @param {?} request
+     * @param {?} subscriber
+     * @return {?}
+     */
+    IndexedDBStore.prototype.initRequest = /**
+     * @private
+     * @template T
+     * @param {?} request
+     * @param {?} subscriber
+     * @return {?}
+     */
+    function (request, subscriber) {
+        request.onsuccess = (/**
+         * @return {?}
+         */
+        function () {
+            if (request.result !== undefined) {
+                subscriber.next(new IndexedDBEvent(IndexedDBEventType.COMPLETE, 1, 1, request.result));
+            }
+            else {
+                subscriber.next(new IndexedDBEvent(IndexedDBEventType.ERROR, 0, 0));
+            }
+            subscriber.complete();
+        });
+        // request出错返回错误信息
+        request.onerror = (/**
+         * @param {?} event
+         * @return {?}
+         */
+        function (event) {
+            subscriber.next(new IndexedDBEvent(IndexedDBEventType.ERROR, 0, 0, request.error));
+            subscriber.complete();
+        });
+    };
+    /**
+     * create observable use rxjs from function then use scan operator
+     * return custom event(IndexedDBEvent)
+     * @param observable
+     * @param total
+     */
+    /**
+     * create observable use rxjs from function then use scan operator
+     * return custom event(IndexedDBEvent)
+     * @private
+     * @template T
+     * @param {?} observable
+     * @param {?} total
+     * @return {?}
+     */
+    IndexedDBStore.prototype._from_scan = /**
+     * create observable use rxjs from function then use scan operator
+     * return custom event(IndexedDBEvent)
+     * @private
+     * @template T
+     * @param {?} observable
+     * @param {?} total
+     * @return {?}
+     */
+    function (observable, total) {
+        return observable
+            .pipe(scan((/**
+         * @param {?} acc
+         * @param {?} value
+         * @return {?}
+         */
+        function (acc, value) {
+            if (value.type !== IndexedDBEventType.ERROR) {
+                acc.loaded++;
+                acc.data.push(value.data);
+                if (acc.loaded === acc.total) {
+                    acc.type = IndexedDBEventType.COMPLETE;
+                }
+            }
+            else {
+                acc.type = IndexedDBEventType.ERROR;
+                acc.loaded = 0;
+            }
+            return acc;
+        }), new IndexedDBEvent(IndexedDBEventType.PENDING, 0, total, new Array())));
+    };
+    /**
+     * connect observable use rxjs concat function(not Operator) then use scan operator
+     * return custom event(event: IndexedDBEvent)
+     * @param observables
+     */
+    /**
+     * connect observable use rxjs concat function(not Operator) then use scan operator
+     * return custom event(event: IndexedDBEvent)
+     * @private
+     * @template T
+     * @param {...?} observables
+     * @return {?}
+     */
+    IndexedDBStore.prototype._concat_scan = /**
+     * connect observable use rxjs concat function(not Operator) then use scan operator
+     * return custom event(event: IndexedDBEvent)
+     * @private
+     * @template T
+     * @param {...?} observables
+     * @return {?}
+     */
+    function () {
+        var observables = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            observables[_i] = arguments[_i];
+        }
+        /** @type {?} */
+        var total = observables.length;
+        return concat.apply(void 0, __spread(observables)).pipe(scan((/**
+         * @param {?} acc
+         * @param {?} value
+         * @return {?}
+         */
+        function (acc, value) {
+            if (value.type !== IndexedDBEventType.ERROR) {
+                acc.loaded++;
+                acc.data.push(value.data);
+                if (acc.loaded === acc.total) {
+                    acc.type = IndexedDBEventType.COMPLETE;
+                }
+            }
+            else {
+                acc.type = IndexedDBEventType.ERROR;
+                acc.loaded = 0;
+            }
+            return acc;
+        }), new IndexedDBEvent(IndexedDBEventType.PENDING, 0, total, new Array())));
+    };
+    return IndexedDBStore;
+}());
+/**
+ * IndexedDB function return value
+ * use to flag IndexedDB event status and loaded status
+ * @template T
+ */
+var /**
+ * IndexedDB function return value
+ * use to flag IndexedDB event status and loaded status
+ * @template T
+ */
+IndexedDBEvent = /** @class */ (function () {
+    function IndexedDBEvent(type, loaded, total, data) {
+        this.type = type;
+        this.loaded = loaded;
+        this.total = total;
+        this.data = data === undefined ? undefined : data;
+    }
+    return IndexedDBEvent;
+}());
+/** @enum {string} */
+var IndexedDBEventType = {
+    PENDING: 'Pending',
+    SUCCESS: 'Success',
+    ERROR: 'Error',
+    COMPLETE: 'Complete',
+};
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
 var FileBrowserComponent = /** @class */ (function () {
-    function FileBrowserComponent() {
+    function FileBrowserComponent(markdownService, renderer) {
+        this.markdownService = markdownService;
+        this.renderer = renderer;
+        this.indexedDBStructs = [
+            {
+                name: 'markdown_article',
+                optionalParameters: {
+                    keyPath: 'id',
+                    autoIncrement: true
+                },
+                indexes: [
+                    {
+                        name: 'title',
+                        keyPath: 'title',
+                        options: {
+                            unique: false
+                        }
+                    }
+                ]
+            }
+        ];
+        /** @type {?} */
+        var inputAreaLi = renderer.createElement('LI');
+        this.renderer.addClass(inputAreaLi, 'fb-li');
+        this.renderer.addClass(inputAreaLi, 'fb-li_create');
+        // inputAreaLi.classList.add('fb-li', 'fb-li_create');
+        /** @type {?} */
+        var inputAreaI = renderer.createElement('I');
+        this.renderer.addClass(inputAreaI, 'material-icons');
+        this.renderer.addClass(inputAreaI, 'md-18');
+        this.renderer.addClass(inputAreaI, 'md-dark');
+        // inputAreaI.classList.add('material-icons', 'md-18', 'md-dark');
+        this.renderer.appendChild(inputAreaI, this.renderer.createText('edit'));
+        /** @type {?} */
+        var inputAreaInput = renderer.createElement('INPUT');
+        this.renderer.addClass(inputAreaInput, 'fb-li_create-input');
+        // inputAreaDiv.classList.add('fb-li_create-input');
+        this.renderer.setAttribute(inputAreaInput, 'contenteditable', 'true');
+        this.renderer.appendChild(inputAreaLi, inputAreaI);
+        this.renderer.appendChild(inputAreaLi, inputAreaInput);
+        this.inputArea = inputAreaLi;
+        /*tslint:disable-next-line*/
+        this.isConnect = false;
+        this.selectedArticles = {};
     }
     /**
      * @return {?}
@@ -1107,17 +2119,215 @@ var FileBrowserComponent = /** @class */ (function () {
      * @return {?}
      */
     function () {
+        var _this = this;
+        IndexedDB.instenceof('ngr2-markdown-db', this.indexedDBStructs)
+            .subscribe((/**
+         * @param {?} db
+         * @return {?}
+         */
+        function (db) {
+            _this.indexedDB = db;
+            _this.isConnect = true;
+            _this.refreshArticles();
+        }));
+        this.fileListArea = this.fileList.nativeElement;
+    };
+    /**
+     * @return {?}
+     */
+    FileBrowserComponent.prototype.createFile = /**
+     * @return {?}
+     */
+    function () {
+        var _this = this;
+        /** @type {?} */
+        var cloneEl = this.inputArea.cloneNode(true);
+        this.renderer.listen(cloneEl, 'keyup', (/**
+         * @param {?} ev
+         * @return {?}
+         */
+        function (ev) {
+            switch (ev.code) {
+                case 'Enter':
+                    _this.indexedDB
+                        .getObjectStore('markdown_article', 'readwrite')
+                        .add(new Article('ce', ((/** @type {?} */ (ev.target))).value))
+                        .subscribe((/**
+                     * @param {?} value
+                     * @return {?}
+                     */
+                    function (value) {
+                        _this.refreshArticles();
+                        _this.renderer.removeChild(_this.fileListArea, cloneEl);
+                    }));
+            }
+        }));
+        this.renderer.appendChild(this.fileListArea, cloneEl);
+    };
+    /**
+     * @return {?}
+     */
+    FileBrowserComponent.prototype.createFolder = /**
+     * @return {?}
+     */
+    function () {
+        console.log('createFolder');
+    };
+    /**
+     * @return {?}
+     */
+    FileBrowserComponent.prototype.rename = /**
+     * @return {?}
+     */
+    function () {
+        var _this = this;
+        /** @type {?} */
+        var cloneEl = this.inputArea.cloneNode(true);
+        /** @type {?} */
+        var id = Object.getOwnPropertyNames(this.selectedArticles)[0];
+        /** @type {?} */
+        var selected = this.selectedArticles[id];
+        this.renderer.listen(cloneEl, 'keyup', (/**
+         * @param {?} ev
+         * @return {?}
+         */
+        function (ev) {
+            switch (ev.code) {
+                case 'Enter':
+                    selected.data.title = ((/** @type {?} */ (ev.target))).value;
+                    _this.indexedDB
+                        .getObjectStore('markdown_article', 'readwrite')
+                        .update(selected.data)
+                        .subscribe((/**
+                     * @param {?} value
+                     * @return {?}
+                     */
+                    function (value) {
+                        _this.refreshArticles();
+                        _this.renderer.removeChild(_this.fileListArea, cloneEl);
+                        _this.selectedArticles[id] = null;
+                    }));
+            }
+        }));
+        this.fileListArea.replaceChild(cloneEl, selected.el);
+        ((/** @type {?} */ (cloneEl.lastChild))).focus();
+    };
+    /**
+     * @return {?}
+     */
+    FileBrowserComponent.prototype.delete = /**
+     * @return {?}
+     */
+    function () {
+        var _this = this;
+        var _a;
+        (_a = this.indexedDB.getObjectStore('markdown_article', 'readwrite')).deleteAll.apply(_a, __spread(Object.getOwnPropertyNames(this.selectedArticles)
+            .map((/**
+         * @param {?} value
+         * @return {?}
+         */
+        function (value) { return _this.selectedArticles[Number.parseInt(value, 10)].data.id; })))).subscribe((/**
+         * @param {?} value
+         * @return {?}
+         */
+        function (value) { return _this.refreshArticles(); }));
+    };
+    /**
+     * @return {?}
+     */
+    FileBrowserComponent.prototype.close = /**
+     * @return {?}
+     */
+    function () {
+        console.log('close');
+    };
+    /**
+     * @param {?} el
+     * @param {?} article
+     * @return {?}
+     */
+    FileBrowserComponent.prototype.select = /**
+     * @param {?} el
+     * @param {?} article
+     * @return {?}
+     */
+    function (el, article) {
+        console.log('select');
+        if (!this.selectedArticles[article.id.toString(10)]) {
+            this.selectedArticles[article.id.toString(10)] = { el: el, data: article };
+            el.classList.add('fb-li_selected');
+        }
+        else {
+            this.selectedArticles[article.id.toString(10)] = null;
+            el.classList.remove('fb-li_selected');
+        }
+    };
+    /**
+     * @param {?} el
+     * @param {?} article
+     * @return {?}
+     */
+    FileBrowserComponent.prototype.open = /**
+     * @param {?} el
+     * @param {?} article
+     * @return {?}
+     */
+    function (el, article) {
+        console.log('open');
+        this.markdownService.reinitialization(article.content);
+    };
+    /**
+     * @private
+     * @return {?}
+     */
+    FileBrowserComponent.prototype.refreshArticles = /**
+     * @private
+     * @return {?}
+     */
+    function () {
+        var _this = this;
+        this.indexedDB.getObjectStore('markdown_article', 'readwrite')
+            .getAll()
+            .subscribe((/**
+         * @param {?} value
+         * @return {?}
+         */
+        function (value) {
+            _this.articles = value.data;
+        }));
     };
     FileBrowserComponent.decorators = [
         { type: Component, args: [{
                     selector: 'nb-file-browser',
-                    template: "file browser\n",
-                    styles: [""]
+                    template: "<div class=\"file-browser\">\r\n  <header class=\"fb-header\"\r\n  >\r\n    <button class=\"fb-button fb-button_hover\"\r\n            (click)=\"createFile()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        note_add\r\n      </i>\r\n    </button>\r\n    <!--\u521B\u5EFA\u6587\u4EF6\u5939\u6682\u65F6\u4E0D\u53EF\u7528-->\r\n    <!--(click)=\"createFolder()\"-->\r\n    <button class=\"fb-button fb-button_disable\"\r\n            style=\"opacity: 0.5;\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        create_new_folder\r\n      </i>\r\n    </button>\r\n    <button class=\"fb-button fb-button_hover\"\r\n            (click)=\"delete()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        delete\r\n      </i>\r\n    </button>\r\n    <button class=\"fb-button fb-button_hover\"\r\n            (click)=\"rename()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        edit\r\n      </i>\r\n    </button>\r\n    <button class=\"fb-button fb-button_hover fb-button_close\"\r\n            (click)=\"close()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        close\r\n      </i>\r\n    </button>\r\n  </header>\r\n  <aside class=\"fb-list\"\r\n  >\r\n    <ul class=\"fb-ul\"\r\n        #fileList\r\n    >\r\n      <li class=\"fb-li fb-li_hover\" *ngFor=\"let article of articles\"\r\n          (click)=\"select($any($event.currentTarget), article)\"\r\n          (dblclick)=\"open($any($event.currentTarget), article)\"\r\n      >\r\n        <i class=\"material-icons md-18 md-dark\">\r\n          insert_drive_file\r\n        </i>\r\n        <span>\r\n          {{ article.title }}\r\n        </span>\r\n      </li>\r\n    </ul>\r\n  </aside>\r\n</div>\r\n",
+                    styles: [".file-browser{display:flex;flex-direction:column;height:100%;background-color:#d3d3d3}.file-browser .fb-button{cursor:pointer;padding:1px 2px;margin:0;border:0;outline:0;height:100%;background-color:transparent}.file-browser .fb-button_hover:hover{background-color:rgba(0,0,0,.1)}.file-browser .fb-button_disable{cursor:default;opacity:.5}.file-browser .fb-button_close{float:right}.file-browser .fb-header{flex:0 0 30px;background-color:rgba(0,0,0,.1)}.file-browser .fb-list{flex:1 1 auto}.file-browser .fb-ul{list-style:none;margin:0;padding:2px}.file-browser .fb-li{display:flex;box-sizing:border-box;font-size:14px;width:190px;padding:2px;margin:3px;background-color:rgba(0,0,0,.05);border-radius:2px}.file-browser .fb-li_hover:hover{background-color:rgba(0,0,0,.1)}.file-browser .fb-li span{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.file-browser .fb-li_selected,.file-browser .fb-li_selected:hover{background-color:rgba(0,0,0,.2)}.file-browser .fb-li_create{background-color:#fff}.file-browser .fb-li_create-input{box-sizing:padding-box;width:163px;padding:0 0 0 5px;outline:0;border:none}"]
                 }] }
     ];
     /** @nocollapse */
-    FileBrowserComponent.ctorParameters = function () { return []; };
+    FileBrowserComponent.ctorParameters = function () { return [
+        { type: Ngr2MarkdownService },
+        { type: Renderer2 }
+    ]; };
+    FileBrowserComponent.propDecorators = {
+        fileList: [{ type: ViewChild, args: ['fileList', { read: ElementRef },] }]
+    };
     return FileBrowserComponent;
+}());
+var Article = /** @class */ (function () {
+    function Article(author, title, content) {
+        if (author === void 0) { author = Article.AUTHOR; }
+        if (title === void 0) { title = Article.TITLE; }
+        if (content === void 0) { content = Article.CONTENT; }
+        this.author = author;
+        this.title = title;
+        this.content = content;
+        this.createTime = new Date();
+        this.lastModifiedTime = this.createTime;
+    }
+    Article.AUTHOR = 'Author';
+    Article.TITLE = 'Default Title';
+    Article.CONTENT = '# Default Title';
+    return Article;
 }());
 
 /**
@@ -1138,7 +2348,7 @@ var StatusBarComponent = /** @class */ (function () {
     StatusBarComponent.decorators = [
         { type: Component, args: [{
                     selector: 'nb-status-bar',
-                    template: "status bar\n",
+                    template: "status bar\r\n",
                     styles: [""]
                 }] }
     ];
@@ -1165,7 +2375,7 @@ var ControlBarComponent = /** @class */ (function () {
     ControlBarComponent.decorators = [
         { type: Component, args: [{
                     selector: 'nb-control-bar',
-                    template: "control bar\n",
+                    template: "control bar\r\n",
                     styles: [""]
                 }] }
     ];
@@ -1192,7 +2402,7 @@ var MenuComponent = /** @class */ (function () {
     MenuComponent.decorators = [
         { type: Component, args: [{
                     selector: 'nb-menu',
-                    template: "menu\n",
+                    template: "menu\r\n",
                     styles: [""]
                 }] }
     ];
@@ -1205,333 +2415,580 @@ var MenuComponent = /** @class */ (function () {
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
-var DragAndDropService = /** @class */ (function () {
-    function DragAndDropService() {
-        this.elementMap = {};
-        this.currentDragElement = new BehaviorSubject(null);
+/** @enum {string} */
+var DragAndDropEventType = {
+    DRAG_START: 'dragstart',
+    DRAG: 'drag',
+    DRAG_END: 'dragend',
+    DRAG_ENTER: 'dragenter',
+    DRAG_OVER: 'dragover',
+    DRAG_LEAVE: 'dragleave',
+    DROP: 'drop',
+};
+// @dynamic
+var DragAndDropEvent = /** @class */ (function () {
+    /*tslint:enable*/
+    // listeners: { [key: string]: (event: DragEvent) => void | boolean };
+    // ondragstart:  (event: DragEvent) => void | boolean;
+    // ondrag:       (event: DragEvent) => void | boolean;
+    // ondragend:    (event: DragEvent) => void | boolean;
+    // ondragenter:  (event: DragEvent) => void | boolean;
+    // ondragover:   (event: DragEvent) => void | boolean;
+    // ondragleave:  (event: DragEvent) => void | boolean;
+    // ondrop:       (event: DragEvent) => void | boolean;
+    function DragAndDropEvent(el, eventOptions, interceptor) {
+        if (eventOptions === void 0) { eventOptions = DragAndDropEvent.ALL_OPTIONS; }
+        this.el = el;
+        this.options = eventOptions;
+        this.observable = this.initEvent(interceptor);
     }
     /**
-     * @param {?} key
-     * @param {?} value
+     * @private
+     * @param {?=} interceptor
      * @return {?}
      */
-    DragAndDropService.prototype.push = /**
-     * @param {?} key
-     * @param {?} value
+    DragAndDropEvent.prototype.initEvent = /**
+     * @private
+     * @param {?=} interceptor
      * @return {?}
      */
-    function (key, value) {
-        this.elementMap[key] = value;
-        return key;
+    function (interceptor) {
+        var _this = this;
+        /** @type {?} */
+        var observables = Object.getOwnPropertyNames(this.options)
+            .reduce((/**
+         * @param {?} previousValue
+         * @param {?} currentValue
+         * @return {?}
+         */
+        function (previousValue, currentValue) {
+            /** @type {?} */
+            var option = _this.options[currentValue];
+            /** @type {?} */
+            var eventObservable = _this.addEventListener(_this.el, option);
+            eventObservable = _this.addListenFunction(eventObservable, option);
+            previousValue.push(eventObservable);
+            return previousValue;
+        }), []);
+        return merge.apply(void 0, __spread(observables));
     };
     /**
-     * @param {?} key
+     * @private
+     * @param {?} el
+     * @param {?} option
+     * @param {?=} resultSelector
      * @return {?}
      */
-    DragAndDropService.prototype.get = /**
-     * @param {?} key
+    DragAndDropEvent.prototype.addEventListener = /**
+     * @private
+     * @param {?} el
+     * @param {?} option
+     * @param {?=} resultSelector
      * @return {?}
      */
-    function (key) {
-        if (!this.elementMap[key]) {
-            return null;
+    function (el, option, resultSelector) {
+        if (resultSelector === void 0) { resultSelector = ((/**
+         * @param {?} args
+         * @return {?}
+         */
+        function (args) { return args; })); }
+        /** @type {?} */
+        var observable = fromEvent(el, option.eventType, option.eventOptions, resultSelector);
+        observable = this.eventOptions(observable, option);
+        observable = this.streamOperator(observable, option);
+        return observable;
+    };
+    /**
+     * @private
+     * @param {?} observable
+     * @param {?} option
+     * @return {?}
+     */
+    DragAndDropEvent.prototype.addListenFunction = /**
+     * @private
+     * @param {?} observable
+     * @param {?} option
+     * @return {?}
+     */
+    function (observable, option) {
+        if (!option.listener) {
+            return observable;
         }
-        return this.elementMap[key];
+        return observable.pipe(tap(option.listener));
     };
     /**
-     * @param {?} key
+     * 根据option设置Event对象上的方法或属性
+     * @param observable
+     * @param option
+     */
+    /**
+     * 根据option设置Event对象上的方法或属性
+     * @private
+     * @param {?} observable
+     * @param {?} option
      * @return {?}
      */
-    DragAndDropService.prototype.remove = /**
-     * @param {?} key
+    DragAndDropEvent.prototype.eventOptions = /**
+     * 根据option设置Event对象上的方法或属性
+     * @private
+     * @param {?} observable
+     * @param {?} option
      * @return {?}
      */
-    function (key) {
-        this.elementMap[key] = null;
+    function (observable, option) {
+        return observable
+            .pipe(map((/**
+         * @param {?} event
+         * @return {?}
+         */
+        function (event) {
+            if (option.preventDefault) {
+                event.preventDefault();
+            }
+            if (option.stopPropagation) {
+                event.stopPropagation();
+                event.cancelBubble = true;
+            }
+            return event;
+        })));
     };
     /**
-     * @param {?} el
-     * @return {?}
+     * 根据option对事件流进行option中设置操作
+     * @param observable
+     * @param option
      */
-    DragAndDropService.prototype.setCurrentElement = /**
-     * @param {?} el
-     * @return {?}
-     */
-    function (el) {
-        this.currentDragElement.next(el);
-    };
     /**
+     * 根据option对事件流进行option中设置操作
+     * @private
+     * @param {?} observable
+     * @param {?} option
      * @return {?}
      */
-    DragAndDropService.prototype.getCurrentElement = /**
+    DragAndDropEvent.prototype.streamOperator = /**
+     * 根据option对事件流进行option中设置操作
+     * @private
+     * @param {?} observable
+     * @param {?} option
      * @return {?}
      */
-    function () {
-        return this.currentDragElement.getValue();
+    function (observable, option) {
+        if (!option.operatorOptions) {
+            return observable;
+        }
+        /** @type {?} */
+        var operator = option.operatorOptions;
+        if (operator.throttleTime && operator.throttleTime > 0) {
+            observable = observable
+                .pipe(throttleTime(operator.throttleTime));
+        }
+        if (operator.filter) {
+            observable = observable
+                .pipe(filter(operator.filter));
+        }
+        return observable;
     };
-    DragAndDropService.decorators = [
-        { type: Injectable, args: [{
-                    providedIn: 'root'
-                },] }
-    ];
-    /** @nocollapse */
-    DragAndDropService.ctorParameters = function () { return []; };
-    /** @nocollapse */ DragAndDropService.ngInjectableDef = defineInjectable({ factory: function DragAndDropService_Factory() { return new DragAndDropService(); }, token: DragAndDropService, providedIn: "root" });
-    return DragAndDropService;
+    /* tslint:disable */
+    DragAndDropEvent.defaultFun = (/**
+     * @param {?} event
+     * @return {?}
+     */
+    function (event) { console.group('on ' + event.type); console.groupEnd(); });
+    DragAndDropEvent.ALL_OPTIONS = {
+        'dragstart': {
+            eventType: DragAndDropEventType.DRAG_START,
+            listener: DragAndDropEvent.defaultFun
+        },
+        'drag': {
+            eventType: DragAndDropEventType.DRAG,
+            listener: DragAndDropEvent.defaultFun,
+            operatorOptions: {
+                throttleTime: 1000
+            }
+        },
+        'dragend': {
+            eventType: DragAndDropEventType.DRAG_END,
+            listener: DragAndDropEvent.defaultFun,
+        },
+        'dragenter': {
+            eventType: DragAndDropEventType.DRAG_ENTER,
+            listener: DragAndDropEvent.defaultFun,
+            preventDefault: true
+        },
+        'dragover': {
+            eventType: DragAndDropEventType.DRAG_OVER,
+            listener: DragAndDropEvent.defaultFun,
+            operatorOptions: {
+                throttleTime: 100
+            },
+            preventDefault: true
+        },
+        'drop': {
+            eventType: DragAndDropEventType.DROP,
+            listener: DragAndDropEvent.defaultFun
+        }
+    };
+    return DragAndDropEvent;
 }());
 
 /**
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
-var DragAndDropDirective = /** @class */ (function () {
-    function DragAndDropDirective(el, dadService) {
-        this.el = el;
-        this.dadService = dadService;
-        this.draggable = true;
-        this.drag = this.ondrag;
-        this.dragend = this.ondragend;
-        this.dragenter = this.ondragenter;
-        this.dragleave = this.ondragleave;
-        this.dragover = this.ondragover;
-        this.dragstart = this.ondragstart;
-        this.droppable = false;
-        this._el = el.nativeElement;
-        this._parent = this._el.parentElement;
+var DragAndDropElement = /** @class */ (function () {
+    function DragAndDropElement(element, parentContainer, elementStyle, demoStyle) {
+        if (elementStyle === void 0) { elementStyle = DragAndDropElement.ELEMENT_STYLE; }
+        if (demoStyle === void 0) { demoStyle = DragAndDropElement.DEMO_STYLE; }
+        var _this = this;
+        // 右上, 左上, 左下, 右下分别对应的角度值
+        this.diagonal = {
+            RT_ANGLE: Math.PI / 4,
+            LT_ANGLE: Math.PI / 4 * 3,
+            LB_ANGLE: Math.PI / 4 * 3 * -1,
+            RB_ANGLE: Math.PI / 4 * -1
+        };
+        this._el = element || null;
+        this.parentContainer = parentContainer || null;
+        this._parent = this._el && this._el.parentElement || null;
+        this.clone = this._el && ((/** @type {?} */ (this._el.cloneNode(true)))) || null;
+        Object.getOwnPropertyNames(elementStyle)
+            .forEach((/**
+         * @param {?} value
+         * @return {?}
+         */
+        function (value) {
+            _this._el.style[value] = elementStyle[value];
+        }));
+        Object.getOwnPropertyNames(demoStyle)
+            .forEach((/**
+         * @param {?} value
+         * @return {?}
+         */
+        function (value) {
+            _this.clone.style[value] = demoStyle[value];
+        }));
+        // set draggable property
+        this._el.draggable = true;
+        // add drag and drop event handler
+        this._dadEvent = new DragAndDropEvent(this._el, {
+            'dragstart': {
+                eventType: DragAndDropEventType.DRAG_START,
+                stopPropagation: true,
+                listener: this.ondragstart.bind(this)
+            },
+            'drag': {
+                eventType: DragAndDropEventType.DRAG,
+                stopPropagation: true,
+                listener: this.ondrag.bind(this),
+                operatorOptions: {
+                    throttleTime: 1000
+                }
+            },
+            'dragend': {
+                eventType: DragAndDropEventType.DRAG_END,
+                stopPropagation: true,
+                listener: this.ondragend.bind(this),
+            },
+            'dragenter': {
+                eventType: DragAndDropEventType.DRAG_ENTER,
+                listener: this.ondragenter.bind(this),
+                preventDefault: true,
+                operatorOptions: {
+                    filter: (/**
+                     * @param {?} event
+                     * @return {?}
+                     */
+                    function (event) {
+                        if (!_this.parentContainer.equals(event)) {
+                            return false;
+                        }
+                        return _this._el !== _this.parentContainer.getDragElement()._el && _this._el === event.target;
+                    })
+                }
+            },
+            'dragover': {
+                eventType: DragAndDropEventType.DRAG_OVER,
+                listener: this.ondragover.bind(this),
+                operatorOptions: {
+                    throttleTime: 100,
+                    filter: (/**
+                     * @param {?} event
+                     * @return {?}
+                     */
+                    function (event) {
+                        if (!_this.parentContainer.equals(event)) {
+                            return false;
+                        }
+                        return _this._el !== _this.parentContainer.getDragElement()._el;
+                    })
+                },
+                preventDefault: true
+            },
+            'drop': {
+                eventType: DragAndDropEventType.DROP,
+                stopPropagation: true,
+                listener: this.ondrop.bind(this)
+            }
+        });
+        this._dadEvent.observable
+            .subscribe((/**
+         * @param {?} value
+         * @return {?}
+         */
+        function (value) { }));
+        // initial
+        this.status = 'none';
+        /** @type {?} */
+        var rect = this.clientRect;
+        this.centerPoint = new Point((rect.left + rect.width / 2), (rect.top + rect.height / 2));
     }
+    Object.defineProperty(DragAndDropElement.prototype, "clientRect", {
+        get: /**
+         * @return {?}
+         */
+        function () {
+            return this._el.getBoundingClientRect();
+        },
+        enumerable: true,
+        configurable: true
+    });
     /**
+     * @deprecated
+     */
+    /**
+     * @deprecated
      * @return {?}
      */
-    DragAndDropDirective.prototype.ngOnInit = /**
+    DragAndDropElement.prototype.reset = /**
+     * @deprecated
      * @return {?}
      */
     function () {
-        this.clone = this.el.nativeElement.cloneNode(true);
-        this.drop = this.droppable ? this.ondrop : (/**
-         * @return {?}
-         */
-        function () { });
+        this.transitDemonstrationFinish(this.parentContainer.getDragElement());
+    };
+    /**
+     * drag start
+     * 用户开始拖动本元素时触发
+     * @param ev - emit event
+     */
+    /**
+     * drag start
+     * 用户开始拖动本元素时触发
+     * @private
+     * @param {?} ev - emit event
+     * @return {?}
+     */
+    DragAndDropElement.prototype.ondragstart = /**
+     * drag start
+     * 用户开始拖动本元素时触发
+     * @private
+     * @param {?} ev - emit event
+     * @return {?}
+     */
+    function (ev) {
+        console.group('on drop start');
+        this.status = 'drag';
+        this.parentContainer.setDragElement(this, ev);
+        console.groupEnd();
     };
     /**
      * drag
-     * 用户正在拖动绑定该事件的元素时触发
+     * 用户正在拖动本元素时触发
      * @param ev - emit event
      */
     /**
      * drag
-     * 用户正在拖动绑定该事件的元素时触发
+     * 用户正在拖动本元素时触发
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
-    DragAndDropDirective.prototype.ondrag = /**
+    DragAndDropElement.prototype.ondrag = /**
      * drag
-     * 用户正在拖动绑定该事件的元素时触发
+     * 用户正在拖动本元素时触发
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
     function (ev) {
         console.group('on drag');
-        console.log(this._el.className);
-        console.groupEnd();
-    };
-    /**
-     * drag start
-     * 用户开始拖动绑定该事件的元素时触发
-     * @param ev - emit event
-     */
-    /**
-     * drag start
-     * 用户开始拖动绑定该事件的元素时触发
-     * @param {?} ev - emit event
-     * @return {?}
-     */
-    DragAndDropDirective.prototype.ondragstart = /**
-     * drag start
-     * 用户开始拖动绑定该事件的元素时触发
-     * @param {?} ev - emit event
-     * @return {?}
-     */
-    function (ev) {
-        console.group('ondropstart');
-        this.dadService.setCurrentElement(this._el);
-        /** @type {?} */
-        var timestamp = new Date().getTime().toString();
-        this.dadService.push(timestamp, this.el.nativeElement);
-        ev.dataTransfer.setData('text/timestamp', timestamp);
         console.groupEnd();
     };
     /**
      * drag end
-     * 用户结束拖动绑定该事件的元素时触发
+     * 用户结束拖动本元素时触发
      * @param ev - emit event
      */
     /**
      * drag end
-     * 用户结束拖动绑定该事件的元素时触发
+     * 用户结束拖动本元素时触发
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
-    DragAndDropDirective.prototype.ondragend = /**
+    DragAndDropElement.prototype.ondragend = /**
      * drag end
-     * 用户结束拖动绑定该事件的元素时触发
+     * 用户结束拖动本元素时触发
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
     function (ev) {
-        console.log('on drag end');
+        console.group('on drag end');
+        this.status = 'none';
+        console.groupEnd();
     };
     /**
      * drag enter
-     * 当另一个被拖动的元素, 进入绑定该事件的元素的容器范围时触发
+     * 当另一个被拖动的元素, 进入本元素的容器范围时触发
+     * [目标放置说明]{@link https://developer.mozilla.org/zh-CN/docs/Web/API/HTML_Drag_and_Drop_API/Drag_operations#droptargets}
      * @param ev - emit event
      */
     /**
      * drag enter
-     * 当另一个被拖动的元素, 进入绑定该事件的元素的容器范围时触发
+     * 当另一个被拖动的元素, 进入本元素的容器范围时触发
+     * [目标放置说明]{\@link https://developer.mozilla.org/zh-CN/docs/Web/API/HTML_Drag_and_Drop_API/Drag_operations#droptargets}
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
-    DragAndDropDirective.prototype.ondragenter = /**
+    DragAndDropElement.prototype.ondragenter = /**
      * drag enter
-     * 当另一个被拖动的元素, 进入绑定该事件的元素的容器范围时触发
+     * 当另一个被拖动的元素, 进入本元素的容器范围时触发
+     * [目标放置说明]{\@link https://developer.mozilla.org/zh-CN/docs/Web/API/HTML_Drag_and_Drop_API/Drag_operations#droptargets}
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
     function (ev) {
+        if (!(this.parentContainer.getDragElement()._parent === this._parent && this._el === ev.target)) {
+            return;
+        }
+        if (this._el === this.parentContainer.getDragElement()._el) {
+            return;
+        }
         console.group('on drag enter');
-        console.log(this._el.className);
-        this._transitDemonstration();
-        ev.preventDefault();
+        this.status = 'drop';
+        this.parentContainer.setDropElement(this);
+        /** @type {?} */
+        var rect = this.clientRect;
+        this.diagonal.RT_ANGLE = Math.atan2(rect.height / 2, rect.width / 2);
+        this.diagonal.LT_ANGLE = Math.PI - this.diagonal.RT_ANGLE;
+        this.diagonal.LB_ANGLE = -this.diagonal.LT_ANGLE;
+        this.diagonal.RB_ANGLE = -this.diagonal.RT_ANGLE;
         console.groupEnd();
     };
     /**
      * drag over
-     * 当另一个被拖动的元素, 在绑定该事件的元素的容器范围内时触发
+     * 当另一个被拖动的元素, 在本元素的容器范围内时触发
      * @param ev - emit event
      */
     /**
      * drag over
-     * 当另一个被拖动的元素, 在绑定该事件的元素的容器范围内时触发
+     * 当另一个被拖动的元素, 在本元素的容器范围内时触发
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
-    DragAndDropDirective.prototype.ondragover = /**
+    DragAndDropElement.prototype.ondragover = /**
      * drag over
-     * 当另一个被拖动的元素, 在绑定该事件的元素的容器范围内时触发
+     * 当另一个被拖动的元素, 在本元素的容器范围内时触发
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
     function (ev) {
         console.group('on drag over');
-        console.log(this._el.className);
+        this.transitDemonstration(this.parentContainer.getDragElement(), new Point(ev.clientX, ev.clientY));
         console.groupEnd();
     };
     /**
+     * @deprecated
      * drag leave
-     * 当另一个被拖动的元素, 离开绑定该事件的元素的容器范围时触发
+     * 当另一个被拖动的元素, 离开本元素的容器范围时触发
      * @param ev - emit event
      */
     /**
+     * @deprecated
      * drag leave
-     * 当另一个被拖动的元素, 离开绑定该事件的元素的容器范围时触发
+     * 当另一个被拖动的元素, 离开本元素的容器范围时触发
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
-    DragAndDropDirective.prototype.ondragleave = /**
+    DragAndDropElement.prototype.ondragleave = /**
+     * @deprecated
      * drag leave
-     * 当另一个被拖动的元素, 离开绑定该事件的元素的容器范围时触发
+     * 当另一个被拖动的元素, 离开本元素的容器范围时触发
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
     function (ev) {
         console.group('on drag leave');
-        console.log(this._el.className);
-        this._transitDemonstrationFinish();
-        ev.preventDefault();
+        this.status = 'none';
+        this.transitDemonstrationFinish(this.parentContainer.getDragElement());
+        console.groupEnd();
+    };
+    /**
+     * drag exit
+     * 当本元素变得不再可拖动时触发
+     * @deprecated
+     * [未被任何浏览器实现]{@link https://developer.mozilla.org/zh-CN/docs/Web/API/Document/dragexit_event}
+     * @param ev - emit event
+     */
+    /**
+     * drag exit
+     * 当本元素变得不再可拖动时触发
+     * @deprecated
+     * [未被任何浏览器实现]{\@link https://developer.mozilla.org/zh-CN/docs/Web/API/Document/dragexit_event}
+     * @private
+     * @param {?} ev - emit event
+     * @return {?}
+     */
+    DragAndDropElement.prototype.ondragexit = /**
+     * drag exit
+     * 当本元素变得不再可拖动时触发
+     * @deprecated
+     * [未被任何浏览器实现]{\@link https://developer.mozilla.org/zh-CN/docs/Web/API/Document/dragexit_event}
+     * @private
+     * @param {?} ev - emit event
+     * @return {?}
+     */
+    function (ev) {
+        console.group('on drag exit');
         console.groupEnd();
     };
     /**
      * drop
-     * 在一个拖动过程中, 释放鼠标时触发
+     * 当另一个被拖动的元素, 在本元素的容器范围内释放鼠标时触发
      * @param ev - emit event
      */
     /**
      * drop
-     * 在一个拖动过程中, 释放鼠标时触发
+     * 当另一个被拖动的元素, 在本元素的容器范围内释放鼠标时触发
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
-    DragAndDropDirective.prototype.ondrop = /**
+    DragAndDropElement.prototype.ondrop = /**
      * drop
-     * 在一个拖动过程中, 释放鼠标时触发
+     * 当另一个被拖动的元素, 在本元素的容器范围内释放鼠标时触发
+     * @private
      * @param {?} ev - emit event
      * @return {?}
      */
     function (ev) {
-        console.group('ondrop');
-        /** @type {?} */
-        var element = this.dadService.get(ev.dataTransfer.getData('text/timestamp'));
-        this._insertBefore(element);
+        console.group('on drop');
+        this.status = 'drop';
+        this.replaceElement(this.parentContainer.getDragElement()._el, this.parentContainer.getDragElement().clone);
         console.groupEnd();
-        ev.preventDefault();
-    };
-    /**
-     * 演示鼠标拖动元素释放后的状态
-     */
-    /**
-     * 演示鼠标拖动元素释放后的状态
-     * @private
-     * @return {?}
-     */
-    DragAndDropDirective.prototype._transitDemonstration = /**
-     * 演示鼠标拖动元素释放后的状态
-     * @private
-     * @return {?}
-     */
-    function () {
-        this._insertBefore(this.dadService.getCurrentElement());
-    };
-    /**
-     * 演示结束, 移除元素
-     */
-    /**
-     * 演示结束, 移除元素
-     * @private
-     * @return {?}
-     */
-    DragAndDropDirective.prototype._transitDemonstrationFinish = /**
-     * 演示结束, 移除元素
-     * @private
-     * @return {?}
-     */
-    function () {
-        this._removeElement(this.dadService.getCurrentElement());
-    };
-    /**
-     * 获取被鼠标拖动的元素
-     * @param ev
-     */
-    /**
-     * 获取被鼠标拖动的元素
-     * @private
-     * @param {?} ev
-     * @return {?}
-     */
-    DragAndDropDirective.prototype._getDragElement = /**
-     * 获取被鼠标拖动的元素
-     * @private
-     * @param {?} ev
-     * @return {?}
-     */
-    function (ev) {
-        return this.dadService.get(ev.dataTransfer.getData('text/timestamp'));
     };
     /**
      * @private
      * @param {?} el
      * @return {?}
      */
-    DragAndDropDirective.prototype._insertBefore = /**
+    DragAndDropElement.prototype.insertBefore = /**
      * @private
      * @param {?} el
      * @return {?}
@@ -1552,7 +3009,7 @@ var DragAndDropDirective = /** @class */ (function () {
      * @param {?} el - insert element
      * @return {?} - return inserted element
      */
-    DragAndDropDirective.prototype._insertAfter = /**
+    DragAndDropElement.prototype.insertAfter = /**
      * `nextElementSibling`: ie8,ie9,safari不兼容
      * 见: https://developer.mozilla.org/en-US/docs/Web/API/NonDocumentTypeChildNode/nextElementSibling
      * @private
@@ -1567,29 +3024,247 @@ var DragAndDropDirective = /** @class */ (function () {
     };
     /**
      * @private
+     * @param {?} point
+     * @return {?}
+     */
+    DragAndDropElement.prototype.computeDirection = /**
+     * @private
+     * @param {?} point
+     * @return {?}
+     */
+    function (point) {
+        this.centerPoint = new Point((this.clientRect.left + this.clientRect.width / 2), (this.clientRect.top + this.clientRect.height / 2));
+        point.relaitiveTo(this.centerPoint);
+        /** @type {?} */
+        var angle = Math.atan2(point.Y, point.X);
+        if (angle >= this.diagonal.RT_ANGLE && angle < this.diagonal.LT_ANGLE) {
+            return 'top';
+        }
+        else if (angle >= this.diagonal.LT_ANGLE || angle < this.diagonal.LB_ANGLE) {
+            return 'left';
+        }
+        else if (angle >= this.diagonal.LB_ANGLE && angle < this.diagonal.RB_ANGLE) {
+            return 'bottom';
+        }
+        else {
+            return 'right';
+        }
+    };
+    /**
+     * 演示鼠标拖动元素释放后的状态
+     */
+    /**
+     * 演示鼠标拖动元素释放后的状态
+     * @private
+     * @param {?} draggedEl
+     * @param {?} point
+     * @return {?}
+     */
+    DragAndDropElement.prototype.transitDemonstration = /**
+     * 演示鼠标拖动元素释放后的状态
+     * @private
+     * @param {?} draggedEl
+     * @param {?} point
+     * @return {?}
+     */
+    function (draggedEl, point) {
+        /** @type {?} */
+        var dir = this.computeDirection(point);
+        if (dir === 'top' || dir === 'left') {
+            this.insertBefore(draggedEl._el);
+        }
+        else if (dir === 'bottom' || dir === 'right') {
+            this.insertAfter(draggedEl._el);
+        }
+        console.log(dir);
+    };
+    /**
+     * 演示结束, 移除元素
+     */
+    /**
+     * 演示结束, 移除元素
+     * @private
+     * @param {?} dragElement
+     * @return {?}
+     */
+    DragAndDropElement.prototype.transitDemonstrationFinish = /**
+     * 演示结束, 移除元素
+     * @private
+     * @param {?} dragElement
+     * @return {?}
+     */
+    function (dragElement) {
+        this.removeElement(dragElement._el);
+    };
+    /**
+     * @private
      * @param {?} el
      * @return {?}
      */
-    DragAndDropDirective.prototype._removeElement = /**
+    DragAndDropElement.prototype.removeElement = /**
      * @private
      * @param {?} el
      * @return {?}
      */
     function (el) {
-        return this._parent.removeChild(el);
+        for (var i = 0; i < this._parent.children.length; i++) {
+            if (this._parent.children[i] === el) {
+                this._parent.removeChild(el);
+                return el;
+            }
+        }
     };
     /**
      * @private
+     * @param {?} newEl
+     * @param {?} oldEl
+     * @return {?}
+     */
+    DragAndDropElement.prototype.replaceElement = /**
+     * @private
+     * @param {?} newEl
+     * @param {?} oldEl
+     * @return {?}
+     */
+    function (newEl, oldEl) {
+        for (var i = 0; i < this._parent.children.length; i++) {
+            if (this._parent.children[i] === oldEl) {
+                this._parent.replaceChild(newEl, oldEl);
+                return oldEl;
+            }
+        }
+    };
+    DragAndDropElement.ELEMENT_STYLE = {
+    // cursor: 'grab'
+    };
+    DragAndDropElement.DEMO_STYLE = {
+        opacity: '0.5'
+    };
+    return DragAndDropElement;
+}());
+var Point = /** @class */ (function () {
+    function Point(X, Y) {
+        this.X = X || null;
+        this.Y = Y || null;
+    }
+    /**
+     * @param {?} relato
+     * @return {?}
+     */
+    Point.prototype.relaitiveTo = /**
+     * @param {?} relato
+     * @return {?}
+     */
+    function (relato) {
+        this.X -= relato.X;
+        this.Y = relato.Y - this.Y;
+    };
+    return Point;
+}());
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+var DragAndDropContainer = /** @class */ (function () {
+    function DragAndDropContainer(element) {
+        this._el = element || null;
+        this._children = element.children || null;
+        this.DADChildren = [];
+        for (var i = 0; i < this._children.length; i++) {
+            /** @type {?} */
+            var el = new DragAndDropElement(((/** @type {?} */ (this._children[i]))), this);
+            this.DADChildren.push(el);
+        }
+    }
+    /**
+     * @param {?} dragEl
      * @param {?} ev
      * @return {?}
      */
-    DragAndDropDirective.prototype._judgeMousePosition = /**
-     * @private
+    DragAndDropContainer.prototype.setDragElement = /**
+     * @param {?} dragEl
+     * @param {?} ev
+     * @return {?}
+     */
+    function (dragEl, ev) {
+        this._dragEl = dragEl;
+        this.id = new Date().getTime();
+        ev.dataTransfer.setData('text/containerid:' + this.id.toString(10), this.id.toString(10));
+    };
+    /**
+     * @return {?}
+     */
+    DragAndDropContainer.prototype.getDragElement = /**
+     * @return {?}
+     */
+    function () {
+        return this._dragEl;
+    };
+    /**
+     * @param {?} dropEl
+     * @return {?}
+     */
+    DragAndDropContainer.prototype.setDropElement = /**
+     * @param {?} dropEl
+     * @return {?}
+     */
+    function (dropEl) {
+        this._dropEl = dropEl;
+    };
+    /**
+     * @return {?}
+     */
+    DragAndDropContainer.prototype.getDropElement = /**
+     * @return {?}
+     */
+    function () {
+        return this._dropEl;
+    };
+    /**
+     * @param {?} ev
+     * @return {?}
+     */
+    DragAndDropContainer.prototype.equals = /**
      * @param {?} ev
      * @return {?}
      */
     function (ev) {
-        return '';
+        /** @type {?} */
+        var id = ev.dataTransfer.types[ev.dataTransfer.types.length - 1];
+        if (!id) {
+            return false;
+        }
+        id = id.split(':')[1];
+        return this.id === Number.parseInt(id, 10);
+    };
+    return DragAndDropContainer;
+}());
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+var DragAndDropDirective = /** @class */ (function () {
+    function DragAndDropDirective(el) {
+        this.el = el;
+    }
+    /**
+     * @return {?}
+     */
+    DragAndDropDirective.prototype.ngOnInit = /**
+     * @return {?}
+     */
+    function () {
+    };
+    /**
+     * @return {?}
+     */
+    DragAndDropDirective.prototype.ngAfterViewInit = /**
+     * @return {?}
+     */
+    function () {
+        this.DADContainer = new DragAndDropContainer(this.el.nativeElement);
     };
     DragAndDropDirective.decorators = [
         { type: Directive, args: [{
@@ -1598,20 +3273,8 @@ var DragAndDropDirective = /** @class */ (function () {
     ];
     /** @nocollapse */
     DragAndDropDirective.ctorParameters = function () { return [
-        { type: ElementRef },
-        { type: DragAndDropService }
+        { type: ElementRef }
     ]; };
-    DragAndDropDirective.propDecorators = {
-        draggable: [{ type: HostBinding, args: ['draggable',] }],
-        drag: [{ type: HostListener, args: ['drag', ['$event'],] }],
-        dragend: [{ type: HostListener, args: ['dragend', ['$event'],] }],
-        dragenter: [{ type: HostListener, args: ['dragenter', ['$event'],] }],
-        dragleave: [{ type: HostListener, args: ['dragleave', ['$event'],] }],
-        dragover: [{ type: HostListener, args: ['dragover', ['$event'],] }],
-        dragstart: [{ type: HostListener, args: ['dragstart', ['$event'],] }],
-        drop: [{ type: HostListener, args: ['drop', ['$event'],] }],
-        droppable: [{ type: Input }]
-    };
     return DragAndDropDirective;
 }());
 
@@ -1624,7 +3287,19 @@ var Ngr2MarkdownModule = /** @class */ (function () {
     }
     Ngr2MarkdownModule.decorators = [
         { type: NgModule, args: [{
-                    declarations: [Ngr2MarkdownComponent, SideTocComponent, HTMLPipePipe, MdPipe, ToolBarComponent, EditBoxComponent, FileBrowserComponent, StatusBarComponent, ControlBarComponent, MenuComponent, DragAndDropDirective],
+                    declarations: [
+                        Ngr2MarkdownComponent,
+                        SideTocComponent,
+                        HTMLPipePipe,
+                        MdPipe,
+                        ToolBarComponent,
+                        EditBoxComponent,
+                        FileBrowserComponent,
+                        StatusBarComponent,
+                        ControlBarComponent,
+                        MenuComponent,
+                        DragAndDropDirective
+                    ],
                     imports: [
                         BrowserModule
                     ],
@@ -1648,6 +3323,6 @@ var Ngr2MarkdownModule = /** @class */ (function () {
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
 
-export { Ngr2MarkdownService, MarkdownOption$1 as MarkdownOption, TOCItem, Ngr2MarkdownComponent, Ngr2MarkdownModule, ControlBarComponent as ɵh, DragAndDropDirective as ɵj, EditBoxComponent as ɵe, FileBrowserComponent as ɵf, MenuComponent as ɵi, HTMLPipePipe as ɵb, MdPipe as ɵc, DragAndDropService as ɵk, SideTocComponent as ɵa, StatusBarComponent as ɵg, ToolBarComponent as ɵd };
+export { Ngr2MarkdownService, EditorOption, TOCItem, Ngr2MarkdownComponent, Ngr2MarkdownModule, ControlBarComponent as ɵh, DragAndDropDirective as ɵj, EditBoxComponent as ɵe, FileBrowserComponent as ɵf, MenuComponent as ɵi, HTMLPipePipe as ɵb, MdPipe as ɵc, SideTocComponent as ɵa, StatusBarComponent as ɵg, ToolBarComponent as ɵd };
 
 //# sourceMappingURL=ngr2-markdown.js.map

@@ -1,174 +1,24 @@
-import { BehaviorSubject } from 'rxjs';
-import { MarkdownImpl, MarkdownOptionImpl } from '../core/markdown';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { MarkdownOptionImpl } from '../core/markdown/markdown';
 import { FileOperatorImpl } from '../core/fileOperator';
 export declare class Ngr2MarkdownService {
-    unitMap: {
-        exist: boolean;
-        child: {
-            'b': {
-                exist: boolean;
-                child: {
-                    'v': {
-                        exist: boolean;
-                        child: {};
-                    };
-                };
-            };
-            'c': {
-                exist: boolean;
-                child: {
-                    'i': {
-                        exist: boolean;
-                        child: {};
-                    };
-                    'p': {
-                        exist: boolean;
-                        child: {};
-                    };
-                };
-            };
-            'h': {
-                exist: boolean;
-                child: {
-                    'c': {
-                        exist: boolean;
-                        child: {};
-                    };
-                    'l': {
-                        exist: boolean;
-                        child: {
-                            'r': {
-                                exist: boolean;
-                                child: {};
-                            };
-                        };
-                    };
-                    'v': {
-                        exist: boolean;
-                        child: {};
-                    };
-                };
-            };
-            'i': {
-                exist: boolean;
-                child: {
-                    'v': {
-                        exist: boolean;
-                        child: {};
-                    };
-                };
-            };
-            'm': {
-                exist: boolean;
-                child: {
-                    'e': {
-                        exist: boolean;
-                        child: {
-                            'r': {
-                                exist: boolean;
-                                child: {};
-                            };
-                        };
-                    };
-                    'm': {
-                        exist: boolean;
-                        child: {};
-                    };
-                    'c': {
-                        exist: boolean;
-                        child: {};
-                    };
-                };
-            };
-            'n': {
-                exist: boolean;
-                child: {
-                    'i': {
-                        exist: boolean;
-                        child: {
-                            'm': {
-                                exist: boolean;
-                                child: {
-                                    'v': {
-                                        exist: boolean;
-                                        child: {};
-                                    };
-                                };
-                            };
-                        };
-                    };
-                };
-            };
-            'p': {
-                exist: boolean;
-                child: {
-                    'a': {
-                        exist: boolean;
-                        child: {
-                            'c': {
-                                exist: boolean;
-                                child: {};
-                            };
-                        };
-                    };
-                };
-            };
-            'q': {
-                exist: boolean;
-                child: {};
-            };
-            't': {
-                exist: boolean;
-                child: {
-                    'p': {
-                        exist: boolean;
-                        child: {};
-                    };
-                };
-            };
-            'w': {
-                exist: boolean;
-                child: {
-                    'v': {
-                        exist: boolean;
-                        child: {};
-                    };
-                };
-            };
-            'x': {
-                exist: boolean;
-                child: {
-                    'a': {
-                        exist: boolean;
-                        child: {
-                            'm': {
-                                exist: boolean;
-                                child: {
-                                    'v': {
-                                        exist: boolean;
-                                        child: {};
-                                    };
-                                };
-                            };
-                        };
-                    };
-                    'e': {
-                        exist: boolean;
-                        child: {};
-                    };
-                    'p': {
-                        exist: boolean;
-                        child: {};
-                    };
-                };
-            };
-        };
-    };
-    markdownIt: MarkdownImpl;
+    /**
+     * 接收Markdown源文本
+     */
+    private originMd;
+    private resetMd;
+    /**
+     * 观察`originMd`通过`render`方法渲染出的HTML
+     */
+    private renderMd;
+    private _md;
     /**
      * 当前浏览的标题的Subject, BehaviorSubject可支持多播(在多处订阅)
      */
     currentHeading: BehaviorSubject<string>;
+    /**
+     * @deprecated
+     */
     currentContent: BehaviorSubject<{
         md: string;
         html: string;
@@ -178,16 +28,30 @@ export declare class Ngr2MarkdownService {
      */
     TOCInfo: BehaviorSubject<TOCItem>;
     constructor();
+    /**
+     * 重置markdown文本
+     * @param md
+     */
+    reinitialization(md: string): void;
+    /**
+     * markdown文本重置后, 发出消息
+     */
+    observerResetMarkdown(): Observable<string>;
+    /**
+     * 更新markdown文本, 用于实时预览功能
+     * @param md
+     */
+    updateMarkdown(md: string | Observable<string>): void;
+    /**
+     * markdown文本更新后, 发出消息
+     */
+    observeMarkdown(): Observable<MarkdownContent>;
     render(markdown: string, options?: MarkdownOptionImpl): string;
     /**
      * 设置当前浏览的标题
      * @param heading - 标题标签的id
      */
     setCurrentHeading(heading: string): void;
-    checkUnit(str: string, unitMap?: any, caseSensitive?: boolean): {
-        unit: string;
-        number: number;
-    };
     /**
      * 将当前显示的内容转换成`data:`url
      * @param type - `markdown`/`html`: 要转换的内容
@@ -201,19 +65,44 @@ export declare class Ngr2MarkdownService {
      */
     private anchor;
 }
+export interface MarkdownContent {
+    md: string;
+    html?: string;
+    Markdown?: {
+        text: string;
+        bytes: number;
+        words: number;
+        lines: number;
+    };
+    HTML?: {
+        text: string;
+        characters: number;
+        words: number;
+        paragraphs: number;
+    };
+}
 /**
  * 目录(TOC)生成的位置
  * start: TOC在内容左边
  * end: 右边
  */
-export declare type TocPos = 'left' | 'right';
+declare type TocPos = 'left' | 'right';
 /**
  * 模式
  * preview: 预览模式
  * edit: 编辑模式
  */
-export declare type Mode = 'preview' | 'edit';
-export declare class MarkdownOption {
+declare type Mode = 'preview' | 'edit';
+export declare class EditorOption {
+    static MODE: Mode;
+    static ANCHOR: boolean;
+    static TOc: boolean;
+    static TOOL_BAR: boolean;
+    static DIRECTION: TocPos;
+    static HEIGHT: string;
+    static THEME_COLOR: string;
+    static BODY_CLASS_NAME: string;
+    mode: Mode;
     anchor: boolean;
     TOC: boolean;
     toolBar: boolean;
@@ -227,7 +116,8 @@ export declare class MarkdownOption {
      */
     themeColor: string;
     bodyClassName: string;
-    constructor(anchor?: boolean, TOC?: boolean, toolBar?: boolean, direction?: TocPos, height?: string, themeColor?: string, bodyClassName?: string);
+    constructor(mode?: Mode, anchor?: boolean, TOC?: boolean, toolBar?: boolean, direction?: TocPos, height?: string, themeColor?: string, bodyClassName?: string);
+    static instanceOf(value: EditorOption): EditorOption;
 }
 export declare class TOCItem {
     content: string;
@@ -236,3 +126,4 @@ export declare class TOCItem {
     children: Array<TOCItem>;
     constructor(content: string, indentLevel: number);
 }
+export {};

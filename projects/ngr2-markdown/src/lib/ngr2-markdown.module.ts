@@ -13,7 +13,19 @@ import { MenuComponent } from './menu/menu.component';
 import { DragAndDropDirective } from './drag-and-drop.directive';
 
 @NgModule({
-  declarations: [Ngr2MarkdownComponent, SideTocComponent, HTMLPipePipe, MdPipe, ToolBarComponent, EditBoxComponent, FileBrowserComponent, StatusBarComponent, ControlBarComponent, MenuComponent, DragAndDropDirective],
+  declarations: [
+    Ngr2MarkdownComponent,
+    SideTocComponent,
+    HTMLPipePipe,
+    MdPipe,
+    ToolBarComponent,
+    EditBoxComponent,
+    FileBrowserComponent,
+    StatusBarComponent,
+    ControlBarComponent,
+    MenuComponent,
+    DragAndDropDirective
+  ],
   imports: [
     BrowserModule
   ],

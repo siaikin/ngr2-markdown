@@ -1,45 +1,45 @@
 import {concat, from, Observable, Subscriber} from 'rxjs';
 import {mergeMap, scan} from 'rxjs/operators';
+import {el} from '@angular/platform-browser/testing/src/browser_util';
 
-export class IndexedDBService {
-  db: IDBDatabase;
-  dbStruct: {
-    [key: string]: {
+// @dynamic
+export class IndexedDB {
+  static O_S_STRUCT = [
+    {
+      name: 'testStore',
       optionalParameters: {
-        keyPath: string
+        keyPath: 'id'
       },
-      indexParameters?: Array<{
-        index: string,
-        options?: {
-          unique: boolean
-        }
-      }>
-    }
-  };
-
-  constructor() {
-    this.dbStruct = {
-      'page': {
-        optionalParameters: {
-          keyPath: 'id'
-        },
-        indexParameters: [
-          {
-            index: 'title',
-            options: {
-              unique: false
-            }
+      indexes: [
+        {
+          name: 'storeName',
+          keyPath: 'storeName',
+          options: {
+            unique: false
           }
-        ]
-      }
-    };
-    const request = window.indexedDB.open('MyTestDatabase');
+        }
+      ]
+    }
+  ];
+
+  private _db: IDBDatabase;
+  private objectStoreStructs: Array<IndexedDBStruct>;
+
+  private constructor(dbName: string = 'testDB',
+                      objectStoreStructs: Array<IndexedDBStruct> = IndexedDB.O_S_STRUCT,
+                      subscriber: Subscriber<IndexedDB>
+  ) {
+    this.objectStoreStructs = objectStoreStructs;
+
+    const request = window.indexedDB.open(dbName);
     request.onerror = (event: Event) => {
       alert('Database error: ' + (<IDBOpenDBRequest> event.target).error);
     };
+
     request.onsuccess  = (event: Event): any => {
       console.log(`IndexedDB open success`);
-      this.db = request.result;
+      this._db = request.result;
+      subscriber.next(this);
     };
 
     /**
@@ -48,27 +48,36 @@ export class IndexedDBService {
      */
     request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
       console.log(`IndexedDB upgrade need`);
-      this.db = request.result;
-      for (const key in this.dbStruct) {
-        if (!this.dbStruct.hasOwnProperty(key)) { continue; }
-        const value = this.dbStruct[key];
-        const objectStore: IDBObjectStore = this.db.createObjectStore(key, value.optionalParameters);
-        if (value.indexParameters !== undefined && value.indexParameters.length > 0) {
-          value.indexParameters.map((item) => {
-            objectStore.createIndex(item.index, item.index, item.options);
+      this._db = request.result;
+
+      this.objectStoreStructs.forEach(store => {
+        const objectStore: IDBObjectStore = this._db.createObjectStore(store.name, store.optionalParameters);
+        if (store.indexes) {
+          store.indexes.forEach(index => {
+            objectStore.createIndex(
+              index.name,
+              index.keyPath || index.name,
+              index.options);
           });
         }
-      }
+      });
     };
   }
 
+  static instenceof(dbName: string = 'testDB',
+                    objectStoreStructs: Array<IndexedDBStruct> = IndexedDB.O_S_STRUCT
+  ): Observable<IndexedDB> {
+    return new Observable(subscriber => {
+      const indexedDB = new IndexedDB(dbName, objectStoreStructs, subscriber);
+    });
+  }
   /**
    * get object store specify name and mode
    * @param storeName
    * @param mode
    */
   getObjectStore(storeName: string, mode: IDBTransactionMode): IndexedDBStore {
-    return new IndexedDBStore(this.db.transaction(storeName, mode).objectStore(storeName));
+    return new IndexedDBStore(this._db.transaction(storeName, mode).objectStore(storeName));
   }
 }
 
@@ -92,7 +101,6 @@ export class IndexedDBStore {
   /**
    * return Observable object send IndexedDBEvent multiple time
    * @param data - add to store object array
-   * @return {Observable<IndexedDBEvent<Array<IDBValidKey>>>}
    */
   addAll<T>(data: T[]): Observable<IndexedDBEvent<Array<IDBValidKey>>> {
     const addObservables: Array<Observable<IndexedDBEvent<IDBValidKey>>> = data.map(
@@ -104,7 +112,6 @@ export class IndexedDBStore {
    * return Observable object send IndexedDBEvent
    * if IndexedDBEvent.type is IndexedDBEventType.SUCCESS then get data from IndexedDBEvent.data
    * @param key
-   * @return {Observable<IndexedDBEvent<T>>}
    */
   getById<T>(key: IDBValidKey): Observable<IndexedDBEvent<T>> {
     return new Observable<IndexedDBEvent<T>>((subscriber: Subscriber<IndexedDBEvent<T>>) => {
@@ -114,10 +121,37 @@ export class IndexedDBStore {
   }
 
   /**
+   * 兼容ie11-10, ie10不支持IndexedDB.getAll()方法, 用openCursor替代
+   * [IndexedDB.IDBObjectStore]{@link https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore}
+   */
+  getAll<T>(): Observable<IndexedDBEvent<Array<T>>> {
+    const observable = new Observable<IndexedDBEvent<T>>((subscriber: Subscriber<IndexedDBEvent<T>>) => {
+      const request: IDBRequest<IDBCursorWithValue> = this.objectStore.openCursor();
+
+      request.onsuccess = (event: Event) => {
+        const cursor = request.result;
+        if (cursor) {
+          subscriber.next(new IndexedDBEvent<T>(IndexedDBEventType.COMPLETE, 1, 1, cursor.value));
+          cursor.continue();
+        } else {
+          subscriber.complete();
+        }
+      };
+      request.onerror = (event: Event) => {
+        subscriber.next(new IndexedDBEvent<T>(IndexedDBEventType.ERROR, 0, 0));
+        subscriber.complete();
+      };
+      // this.initRequest<Array<T>>(request, subscriber);
+    });
+    return this.getCount()
+      .pipe(
+        mergeMap((value: IndexedDBEvent<number>) => this._from_scan(observable, value.data))
+      );
+  }
+  /**
    * return Observable object will send IndexedDBEvent multiple time
    * will add T to IndexedDBEvent.data every time
    * @param keys - ids
-   * @return {Observable<IndexedDBEvent<Array<T>>>}
    */
   getAllById<T>(...keys: Array<IDBValidKey>): Observable<IndexedDBEvent<Array<T>>> {
     const getObservables: Array<Observable<IndexedDBEvent<T>>> = keys.map(
@@ -127,27 +161,24 @@ export class IndexedDBStore {
 
   /**
    * like getAllById but parameter type is IDBIndex
-   * @param index - get index from IDBObjectStore.index()
-   * @return {Observable<IndexedDBEvent<Array<T>>>}
+   * @param indexName - index name
    */
-  getAllByIndex<T>(index: IDBIndex): Observable<IndexedDBEvent<Array<T>>> {
+  getAllByIndex<T>(indexName: string): Observable<IndexedDBEvent<Array<T>>> {
+    const index = this.objectStore.index(indexName);
     const observable = new Observable<IndexedDBEvent<T>>((subscriber: Subscriber<IndexedDBEvent<T>>) => {
-      const countRequest = index.count();
-      countRequest.onsuccess = () => {
-        const request: IDBRequest<IDBCursorWithValue> = index.openCursor();
-        request.onsuccess = (event: Event) => {
-          const cursor: IDBCursorWithValue = request.result;
-          if (cursor) {
-            subscriber.next(new IndexedDBEvent<T>(IndexedDBEventType.COMPLETE, 1, 1, <T> cursor.value));
-            cursor.continue();
-          } else {
-            subscriber.complete();
-          }
-        };
-        request.onerror = (event: Event) => {
-          subscriber.next(new IndexedDBEvent<T>(IndexedDBEventType.ERROR, 0, 0));
+      const request: IDBRequest<IDBCursorWithValue> = index.openCursor();
+      request.onsuccess = (event: Event) => {
+        const cursor: IDBCursorWithValue = request.result;
+        if (cursor) {
+          subscriber.next(new IndexedDBEvent<T>(IndexedDBEventType.COMPLETE, 1, 1, <T> cursor.value));
+          cursor.continue();
+        } else {
           subscriber.complete();
-        };
+        }
+      };
+      request.onerror = (event: Event) => {
+        subscriber.next(new IndexedDBEvent<T>(IndexedDBEventType.ERROR, 0, 0));
+        subscriber.complete();
       };
     });
 
@@ -161,7 +192,6 @@ export class IndexedDBStore {
    * return observable object send IndexedDBEvent
    * if success IndexedDBEvent.data is updated object primary key
    * @param data
-   * @return {Observable<IndexedDBEvent<IDBValidKey>>}
    */
   update<T>(data: T): Observable<IndexedDBEvent<IDBValidKey>> {
     return new Observable<IndexedDBEvent<IDBValidKey>>((subscriber: Subscriber<IndexedDBEvent<IDBValidKey>>) => {
@@ -174,7 +204,6 @@ export class IndexedDBStore {
    * return observable object send IndexedDBEvent multiple time
    * every time will add success updated object primary key to IndexedDBEvent.data
    * @param data
-   * @return {Observable<IndexedDBEvent<Array<IDBValidKey>>>}
    */
   updateAll<T>(data: T[]): Observable<IndexedDBEvent<Array<IDBValidKey>>> {
     const updateObservables: Array<Observable<IndexedDBEvent<IDBValidKey>>> = data.map(
@@ -186,7 +215,6 @@ export class IndexedDBStore {
    * delete
    * if success return IndexedDBEvent.data type is undefined
    * @param key
-   * @return {Observable<IndexedDBEvent<undefined>>}
    */
   delete(key: IDBValidKey | IDBKeyRange): Observable<IndexedDBEvent<undefined>> {
     return new Observable<IndexedDBEvent<undefined>>((subscriber: Subscriber<IndexedDBEvent<undefined>>) => {
@@ -205,7 +233,6 @@ export class IndexedDBStore {
    * return observable object send IndexedDBEvent, IndexedDBEvent.data is IDBObjectStore or IDBIndex contain element's count
    * @param object
    * @param key
-   * @return {Observable<IndexedDBEvent<number>>}
    */
   getCount(object?: IDBIndex, key?: IDBValidKey | IDBKeyRange): Observable<IndexedDBEvent<number>> {
     return new Observable((subscriber: Subscriber<IndexedDBEvent<number>>) => {
@@ -214,7 +241,7 @@ export class IndexedDBStore {
     });
   }
 
-  private initRequest<T>(request: IDBRequest<T>, subscriber: Subscriber<IndexedDBEvent<T>>): void {
+  private initRequest<T>(request: IDBRequest<T>, subscriber: Subscriber<IndexedDBEvent<T | DOMException>>): void {
     request.onsuccess = () => {
       if (request.result !== undefined) {
         subscriber.next(new IndexedDBEvent<T>(IndexedDBEventType.COMPLETE, 1, 1, request.result));
@@ -223,8 +250,9 @@ export class IndexedDBStore {
       }
       subscriber.complete();
     };
+    // request出错返回错误信息
     request.onerror = (event: Event) => {
-      subscriber.next(new IndexedDBEvent<T>(IndexedDBEventType.ERROR, 0, 0));
+      subscriber.next(new IndexedDBEvent<DOMException>(IndexedDBEventType.ERROR, 0, 0, request.error));
       subscriber.complete();
     };
   }
@@ -234,11 +262,9 @@ export class IndexedDBStore {
    * return custom event(IndexedDBEvent)
    * @param observable
    * @param total
-   * @private
-   * @return {Observable<IndexedDBEvent<Array<T>>>}
    */
   private _from_scan<T>(observable: Observable<IndexedDBEvent<T>>, total: number): Observable<IndexedDBEvent<Array<T>>> {
-    return from(observable)
+    return observable
       .pipe(
         scan<IndexedDBEvent<T>, IndexedDBEvent<Array<T>>>(
           (acc: IndexedDBEvent<Array<T>>, value: IndexedDBEvent<T>): IndexedDBEvent<Array<T>> => {
@@ -260,8 +286,6 @@ export class IndexedDBStore {
    * connect observable use rxjs concat function(not Operator) then use scan operator
    * return custom event(event: IndexedDBEvent)
    * @param observables
-   * @private
-   * @return {Observable<IndexedDBEvent<Array<T>>>}
    */
   private _concat_scan<T>(...observables: Array<Observable<IndexedDBEvent<T>>>): Observable<IndexedDBEvent<Array<T>>> {
     const total = observables.length;
@@ -284,6 +308,15 @@ export class IndexedDBStore {
   }
 }
 
+export interface IndexedDBStruct {
+  name: string;
+  optionalParameters: IDBObjectStoreParameters;
+  indexes: Array<{
+    name: string,
+    keyPath?: string,
+    options: IDBIndexParameters
+  }>;
+}
 /**
  * IndexedDB function return value
  * use to flag IndexedDB event status and loaded status

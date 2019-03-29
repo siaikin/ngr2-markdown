@@ -1,208 +1,43 @@
 import {Injectable} from '@angular/core';
 import * as MarkdownIt from 'markdown-it/lib/index';
 import {BehaviorSubject, Observable, Observer} from 'rxjs';
-import {MarkdownImpl, MarkdownOptionImpl} from '../core/markdown';
+import {MarkdownImpl, MarkdownOptionImpl} from '../core/markdown/markdown';
 import {FileOperatorImpl} from '../core/fileOperator';
-import {filter, map} from 'rxjs/operators';
+import {map} from 'rxjs/operators';
+import {TextParser} from '../utils/textParser';
+import {IndexedDB} from '../core/indexedDB/indexedDB';
 
 @Injectable({
   providedIn: 'root'
 })
 export class Ngr2MarkdownService {
-  unitMap = {
-    exist: false,
-    child: {
-      'b': {
-        exist: false,
-        child: {
-          'v': {
-            exist: true,
-            child: {
-            }
-          }
-        }
-      },
-      'c': {
-        exist: false,
-        child: {
-          'i': {
-            exist: true,
-            child: {
-            }
-          },
-          'p': {
-            exist: true,
-            child: {
-            }
-          }
-        }
-      },
-      'h': {
-        exist: false,
-        child: {
-          'c': {
-            exist: true,
-            child: {
-            }
-          },
-          'l': {
-            exist: true,
-            child: {
-              'r': {
-                exist: true,
-                child: {
-                }
-              }
-            }
-          },
-          'v': {
-            exist: true,
-            child: {
-            }
-          }
-        }
-      },
-      'i': {
-        exist: false,
-        child: {
-          'v': {
-            exist: true,
-            child: {
-            }
-          }
-        }
-      },
-      'm': {
-        exist: false,
-        child: {
-          'e': {
-            exist: true,
-            child: {
-              'r': {
-                exist: true,
-                child: {
-                }
-              }
-            }
-          },
-          'm': {
-            exist: true,
-            child: {
-            }
-          },
-          'c': {
-            exist: true,
-            child: {
-            }
-          }
-        }
-      },
-      'n': {
-        exist: false,
-        child: {
-          'i': {
-            exist: true,
-            child: {
-              'm': {
-                exist: false,
-                child: {
-                  'v': {
-                    exist: true,
-                    child: {
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      'p': {
-        exist: false,
-        child: {
-          'a': {
-            exist: false,
-            child: {
-              'c': {
-                exist: true,
-                child: {
-                }
-              },
-            }
-          },
-        }
-      },
-      'q': {
-        exist: true,
-        child: {
-        }
-      },
-      't': {
-        exist: false,
-        child: {
-          'p': {
-            exist: true,
-            child: {
-            }
-          }
-        }
-      },
-      'w': {
-        exist: false,
-        child: {
-          'v': {
-            exist: true,
-            child: {
-            }
-          }
-        }
-      },
-      'x': {
-        exist: false,
-        child: {
-          'a': {
-            exist: false,
-            child: {
-              'm': {
-                exist: false,
-                child: {
-                  'v': {
-                    exist: true,
-                    child: {
-                    }
-                  }
-                }
-              }
-            }
-          },
-          'e': {
-            exist: true,
-            child: {
-            }
-          },
-          'p': {
-            exist: true,
-            child: {
-            }
-          }
-        }
-      }
-    }
-  };
-  markdownIt: MarkdownImpl;
+
+  /**
+   * 接收Markdown源文本
+   */
+  private originMd: BehaviorSubject<string> = new BehaviorSubject<string>(null);
+  private resetMd: BehaviorSubject<string> = new BehaviorSubject<string>(null);
+  /**
+   * 观察`originMd`通过`render`方法渲染出的HTML
+   */
+  private renderMd: Observable<MarkdownContent>;
+  private _md: MarkdownImpl;
   /**
    * 当前浏览的标题的Subject, BehaviorSubject可支持多播(在多处订阅)
    */
   currentHeading: BehaviorSubject<string> = new BehaviorSubject<string>(null);
-  currentContent: BehaviorSubject<{md: string, html: string}> = new BehaviorSubject<{md: string, html: string}>(null);
+  /**
+   * @deprecated
+   */
+  currentContent: BehaviorSubject<{md: string, html: string}> = new BehaviorSubject<{md: string, html: string}>({md: '', html: ''});
   /**
    * 发送目录信息的Subject
    */
   TOCInfo: BehaviorSubject<TOCItem> = new BehaviorSubject<TOCItem>(null);
 
   constructor() {
-    this.markdownIt = new MarkdownImpl();
-    this.markdownIt.use(this.anchor)
+    this._md = new MarkdownImpl();
+    this._md.use(this.anchor)
       .subscribe((value: Array<any>) => {
         const infoList = value.map((item) => {
           return new TOCItem(item.content, item.indentLevel);
@@ -219,17 +54,65 @@ export class Ngr2MarkdownService {
         }
         this.TOCInfo.next(root);
       });
+
+    this.renderMd = this.originMd
+      .pipe(
+        map(mdText => {
+          return {
+            md:   mdText || null,
+            html: this.render(mdText)
+          };
+        })
+      );
+
+    this.resetMd
+      .subscribe(this.originMd);
+  }
+
+  /**
+   * 重置markdown文本
+   * @param md
+   */
+  reinitialization(md: string): void {
+    if (!md) { return; }
+    this.resetMd.next(md);
+  }
+
+  /**
+   * markdown文本重置后, 发出消息
+   */
+  observerResetMarkdown(): Observable<string> {
+    return this.resetMd;
+  }
+
+  /**
+   * 更新markdown文本, 用于实时预览功能
+   * @param md
+   */
+  updateMarkdown(md: string | Observable<string>): void {
+    if (!md) { return; }
+
+    if (md instanceof Observable) {
+      md.subscribe(this.originMd);
+    } else {
+      this.originMd.next(md);
+    }
+  }
+
+  /**
+   * markdown文本更新后, 发出消息
+   */
+  observeMarkdown(): Observable<MarkdownContent> {
+    return this.renderMd;
   }
 
   render(markdown: string, options?: MarkdownOptionImpl): string {
-    if (typeof markdown !== 'string') {
+    if (!markdown) {
       markdown = '';
     }
-    const html = this.markdownIt.render(markdown, options);
-    this.currentContent.next({
-      md: markdown,
-      html
-    });
+    const html = this._md.render(markdown, options);
+    TextParser.parseMD(markdown);
+    TextParser.parseHTML(html);
     return html;
   }
 
@@ -243,46 +126,23 @@ export class Ngr2MarkdownService {
     }
   }
 
-  checkUnit(str: string, unitMap: any = this.unitMap, caseSensitive?: boolean): {
-    unit: string,
-    number: number
-  } {
-    if (!unitMap || !str) { return; }
-    if (!caseSensitive) { str = str.toLocaleLowerCase(); }
-    let i: number, isMatch = false;
-    for (i = str.length - 1; i >= 0; i--) {
-      const ascii = str.charCodeAt(i);
-      if (ascii >= 48 && ascii <= 57) {
-        isMatch = unitMap.exist;
-        break;
-      } else {
-        if (!unitMap.child[str[i]]) { break; }
-        unitMap = unitMap.child[str[i]];
-      }
-    }
-    return isMatch ? {
-      unit: str.substr(i + 1),
-      number: Number.parseInt(str.substr(0, i + 1), 10)
-    } : null;
-  }
-
-
   /**
    * 将当前显示的内容转换成`data:`url
    * @param type - `markdown`/`html`: 要转换的内容
    */
   currentContentToDataUrl(type: string): FileOperatorImpl {
     const fileOperator = new FileOperatorImpl();
-    let file: File;
+    // 兼容ie11-10, ie10不支持File对象的构造函数, 无法新建File对象, 故使用Blob
+    let file: Blob | File;
     switch (type) {
       case 'markdown':
-        file = new File([this.currentContent.getValue().md], 'markdown', {type: 'text/plain'});
+        file = new Blob([this.currentContent.getValue().md], {type: 'text/plain'});
         break;
       case `html`:
-        file = new File([this.currentContent.getValue().html], 'html', {type: 'text/html'});
+        file = new Blob([this.currentContent.getValue().html], {type: 'text/html'});
         break;
       default:
-        file = new File(['null'], 'html', {type: 'text/html'});
+        file = new Blob(['null'], {type: 'text/html'});
         break;
     }
     fileOperator.toDataURLSync(file);
@@ -297,7 +157,7 @@ export class Ngr2MarkdownService {
    */
   private anchor(md: MarkdownIt, observer: Observer<Array<any>>) {
     md.core.ruler.push('anchor', (state => {
-      const infoList: Array<any> = new Array<any>();
+      const infoList: Array<any> = [];
       state.tokens.map((token, index, array) => {
         if (token.type === 'heading_open') {
           token.attrJoin('id', array[index + 1].content);
@@ -312,20 +172,46 @@ export class Ngr2MarkdownService {
   }
 }
 
+export interface MarkdownContent {
+  md: string;
+  html?: string;
+  Markdown?: {
+    text:   string,
+    bytes:  number,
+    words:  number,
+    lines:  number
+  };
+  HTML?: {
+    text:       string,
+    characters: number,
+    words:      number,
+    paragraphs: number
+  };
+}
 /**
  * 目录(TOC)生成的位置
  * start: TOC在内容左边
  * end: 右边
  */
-export type TocPos = 'left' | 'right';
+type TocPos = 'left' | 'right';
 /**
  * 模式
  * preview: 预览模式
  * edit: 编辑模式
  */
-export type Mode = 'preview' | 'edit';
+type Mode = 'preview' | 'edit';
 
-export class MarkdownOption {
+export class EditorOption {
+  static MODE: Mode = 'edit';
+  static ANCHOR = false;
+  static TOc = false;
+  static TOOL_BAR = false;
+  static DIRECTION: TocPos = 'left';
+  static HEIGHT = '800px';
+  static THEME_COLOR = '#3f51b5';
+  static BODY_CLASS_NAME = 'markdown-body';
+
+  mode: Mode;
   anchor: boolean;
   TOC: boolean;
   toolBar: boolean;
@@ -340,21 +226,36 @@ export class MarkdownOption {
   themeColor: string;
   bodyClassName: string;
 
-  constructor(anchor: boolean = false,
-              TOC: boolean = false,
-              toolBar: boolean = false,
-              direction: TocPos = 'left',
-              height: string = '800px',
-              themeColor: string = '#3f51b5',
-              bodyClassName: string = 'markdown-body'
+  constructor(mode: Mode            = EditorOption.MODE,
+            anchor: boolean         = EditorOption.ANCHOR,
+              TOC: boolean          = EditorOption.TOc,
+              toolBar: boolean      = EditorOption.TOOL_BAR,
+              direction: TocPos     = EditorOption.DIRECTION,
+              height: string        = EditorOption.HEIGHT,
+              themeColor: string    = EditorOption.THEME_COLOR,
+              bodyClassName: string = EditorOption.BODY_CLASS_NAME
   ) {
-    this.anchor = anchor;
-    this.TOC = TOC;
-    this.toolBar = toolBar;
-    this.direction = direction;
-    this.height = height;
-    this.themeColor = themeColor;
-    this.bodyClassName = bodyClassName;
+    this.mode =           mode;
+    this.anchor =         anchor;
+    this.TOC =            TOC;
+    this.toolBar =        toolBar;
+    this.direction =      direction;
+    this.height =         height;
+    this.themeColor =     themeColor;
+    this.bodyClassName =  bodyClassName;
+  }
+
+  static instanceOf(value: EditorOption) {
+    return new EditorOption(
+      value.mode          || EditorOption.MODE,
+      value.anchor        || EditorOption.ANCHOR,
+      value.TOC           || EditorOption.TOc,
+      value.toolBar       || EditorOption.TOOL_BAR,
+      value.direction     || EditorOption.DIRECTION,
+      value.height        || EditorOption.HEIGHT,
+      value.themeColor    || EditorOption.THEME_COLOR,
+      value.bodyClassName || EditorOption.BODY_CLASS_NAME,
+    );
   }
 }
 
@@ -365,8 +266,8 @@ export class TOCItem {
   children: Array<TOCItem>;
 
   constructor(content: string, indentLevel: number) {
-    this.content = content;
-    this.indentLevel = indentLevel;
-    this.children = new Array<TOCItem>();
+    this.content      = content;
+    this.indentLevel  = indentLevel;
+    this.children     = new Array<TOCItem>();
   }
 }

@@ -1,5 +1,5 @@
 import { ElementRef, OnInit } from '@angular/core';
-import { MarkdownOption, Mode, Ngr2MarkdownService } from './service/ngr2-markdown.service';
+import { EditorOption, Ngr2MarkdownService } from './service/ngr2-markdown.service';
 export declare class Ngr2MarkdownComponent implements OnInit {
     private markdownService;
     markdownBody: ElementRef;
@@ -10,7 +10,7 @@ export declare class Ngr2MarkdownComponent implements OnInit {
     /**
      * 配置参数
      */
-    _options: MarkdownOption;
+    _options: EditorOption;
     /**
      * 标题标签引用的数组
      */
@@ -23,8 +23,7 @@ export declare class Ngr2MarkdownComponent implements OnInit {
         [key: string]: number;
     };
     markdown: string;
-    options: MarkdownOption;
-    mode: Mode;
+    options: EditorOption;
     constructor(markdownService: Ngr2MarkdownService);
     ngOnInit(): void;
     reinitialization(): void;

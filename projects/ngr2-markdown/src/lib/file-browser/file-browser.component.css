@@ -1,0 +1,86 @@
+.file-browser {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: lightgray;
+}
+
+.file-browser .fb-button {
+  cursor: pointer;
+  padding: 1px 2px;
+  margin: 0;
+  border: 0;
+  outline: none;
+  height: 100%;
+  background-color: transparent;
+}
+
+/* icon hover on light background */
+.file-browser .fb-button_hover:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.file-browser .fb-button_disable {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.file-browser .fb-button_close {
+  float: right;
+}
+
+.file-browser .fb-header {
+  flex: 0 0 30px;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.file-browser .fb-list {
+  flex: 1 1 auto;
+}
+
+.file-browser .fb-ul {
+  list-style: none;
+  margin: 0;
+  padding: 2px;
+}
+
+.file-browser .fb-li {
+  display: flex;
+  box-sizing: border-box;
+  font-size: 14px;
+  width: 190px;
+  padding: 2px;
+  margin: 3px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 2px;
+}
+
+.file-browser .fb-li_hover:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.file-browser .fb-li span {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.file-browser .fb-li_selected {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.file-browser .fb-li_selected:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.file-browser .fb-li_create {
+  background-color: white;
+}
+
+.file-browser .fb-li_create-input {
+  box-sizing: padding-box;
+  width: 163px;
+  padding: 0 0 0 5px;
+  outline: none;
+  border: none;
+}
