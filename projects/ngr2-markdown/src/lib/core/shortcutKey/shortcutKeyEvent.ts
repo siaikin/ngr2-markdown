@@ -1,6 +1,5 @@
 import {fromEvent, Observable} from 'rxjs';
-import {filter} from 'rxjs/operators';
-import {el} from '@angular/platform-browser/testing/src/browser_util';
+import {filter, map} from 'rxjs/operators';
 
 type ShortcutKeyEventType = 'keydown' | 'keypress' | 'keyup';
 
@@ -8,53 +7,144 @@ type ShortcutKeyEventType = 'keydown' | 'keypress' | 'keyup';
 export class ShortcutKeyEvent {
 
   static SHORTCUT_KEY_OPTIONS: { [key: string]: ShortcutKeyOption} = {
+    'Select All': {
+      operateType: 'Select All',
+      shortcutKey: {
+        ctrl: true,
+        key: 'a'
+      },
+    },
     'Copy': {
       operateType: 'Copy',
       shortcutKey: {
         ctrl: true,
         key: 'c'
+      },
+      preventDefault: true
+    },
+    'Paste': {
+      operateType: 'Paste',
+      shortcutKey: {
+        ctrl: true,
+        key: 'v'
+      }
+    },
+    'Cut': {
+      operateType: 'Cut',
+      shortcutKey: {
+        ctrl: true,
+        key: 'x'
+      },
+      preventDefault: true
+    },
+    'Undo': {
+      operateType: 'Undo',
+      shortcutKey: {
+        ctrl: true,
+        key: 'z'
+      }
+    },
+    'Redo': {
+      operateType: 'Redo',
+      shortcutKey: {
+        ctrl: true,
+        shift: true,
+        key: 'z'
       }
     }
   };
 
   private _el: Element;
-  private sKOptions: { [key: string]: ShortcutKeyOption};
+  private sKOpts: { [key: string]: ShortcutKeyOption};
   observable: Observable<KeyboardEvent>;
 
   constructor(el: Element,
-              shortcutKeyOptions: { [key: string]: ShortcutKeyOption} = ShortcutKeyEvent.SHORTCUT_KEY_OPTIONS
+              sKOpts: { [key: string]: ShortcutKeyOption} = ShortcutKeyEvent.SHORTCUT_KEY_OPTIONS
   ) {
-    this._el        = el;
-    this.sKOptions  = shortcutKeyOptions;
+    this._el    = el;
+    this.sKOpts = sKOpts;
 
     this.observable = this.listenEvent('keydown');
   }
 
+  /**
+   * 监听源事件
+   * @param eventType
+   * @param options
+   */
   private listenEvent(eventType: ShortcutKeyEventType, options?: EventListenerOptions): Observable<KeyboardEvent> {
-    return fromEvent(this._el, eventType, options, args => args);
+    const observable = fromEvent(this._el, eventType, options, args => args);
+    return observable;
   }
 
-  private dispatch(event: KeyboardEvent, option: ShortcutKeyOption): boolean {
-    if (event.shiftKey  === (option.shortcutKey.shift || false) &&
-        event.ctrlKey   === (option.shortcutKey.ctrl  || false) &&
-        event.altKey    === (option.shortcutKey.alt   || false) &&
-        event.key       === (option.shortcutKey.key   || false)
-    ) {
-      return true;
-    } else {
-      return false;
-    }
-  }
+  /**
+   * 根据`option`过滤数据流, 然后分发给具体的操作如: `Copy`, `Paste`等等
+   * @param option
+   */
+   private dispatch(option: ShortcutKeyOption): Observable<KeyboardEvent> {
+    if (!option) { return null; }
 
-  copy(): Observable<KeyboardEvent> {
     return this.observable
       .pipe(
-        filter(event => this.dispatch(event, this.sKOptions['Copy']))
+        filter(event => event.shiftKey  === (option.shortcutKey.shift || false) &&
+          event.ctrlKey   === (option.shortcutKey.ctrl  || false) &&
+          event.altKey    === (option.shortcutKey.alt   || false) &&
+          event.key       === (option.shortcutKey.key   || false)
+        ),
+        map(event => {
+          if (option.preventDefault) { event.preventDefault(); }
+          if (option.stopPropagation) { event.stopPropagation(); event.cancelBubble = true; }
+          return event;
+        })
       );
+  }
+
+  private eventOptions(observable: Observable<KeyboardEvent>, option: ShortcutKeyOption): Observable<KeyboardEvent> {
+    return observable
+      .pipe(
+        map(event => {
+          if (option.preventDefault) { event.preventDefault(); }
+          if (option.stopPropagation) { event.stopPropagation(); event.cancelBubble = true; }
+          return event;
+        })
+      );
+  }
+
+  /**
+   * 观察指定操作
+   * @param operateType
+   */
+  specOprt(operateType: ShortcutKeyEventType): Observable<KeyboardEvent> {
+    if (!operateType) { return null; }
+    return this.dispatch(this.sKOpts[operateType]);
+  }
+
+  copyOprt(): Observable<KeyboardEvent> {
+    return this.dispatch(this.sKOpts['Copy']);
+  }
+
+  selectAllOprt(): Observable<KeyboardEvent> {
+    return this.dispatch(this.sKOpts['Select All']);
+  }
+
+  pasteOprt(): Observable<KeyboardEvent> {
+    return this.dispatch(this.sKOpts['Paste']);
+  }
+
+  cutOprt(): Observable<KeyboardEvent> {
+    return this.dispatch(this.sKOpts['Cut']);
+  }
+
+  undoOprt(): Observable<KeyboardEvent> {
+    return this.dispatch(this.sKOpts['Undo']);
+  }
+
+  redoOprt(): Observable<KeyboardEvent> {
+    return this.dispatch(this.sKOpts['Redo']);
   }
 }
 
-export class ShortcutKeyOption {
+export interface ShortcutKeyOption {
   operateType: 'Select All' | 'Copy' | 'Paste' | 'Cut' | 'Undo'  | 'Redo';
   shortcutKey: {
     shift?: boolean;
@@ -62,4 +152,7 @@ export class ShortcutKeyOption {
     alt?: boolean;
     key: string;
   };
+  preventDefault?: boolean;
+  stopPropagation?: boolean;
+  eventOptions?: EventListenerOptions;
 }

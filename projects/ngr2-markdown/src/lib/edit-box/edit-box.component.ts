@@ -2,7 +2,7 @@ import {Component, ElementRef, OnInit} from '@angular/core';
 import {Observable, Subject} from 'rxjs';
 import {debounceTime, distinctUntilChanged} from 'rxjs/operators';
 import {Ngr2MarkdownService} from '../service/ngr2-markdown.service';
-import {ShortcutKeyEvent} from '../core/shortcutKey/shortcutKeyEvent';
+import {ShortcutKey} from '../core/shortcutKey/shortcutKey';
 
 @Component({
   selector: 'nb-edit-box',
@@ -15,6 +15,13 @@ export class EditBoxComponent implements OnInit {
   private _editArea: HTMLElement;
   private mdSubject: Subject<string> = new Subject<string>();
 
+  set text (value: string) {
+    this._editArea.innerText = value;
+  }
+  get text (): string {
+    return this._editArea.innerText;
+  }
+
   constructor(private markdownService: Ngr2MarkdownService,
               el: ElementRef
   ) {
@@ -23,15 +30,10 @@ export class EditBoxComponent implements OnInit {
 
   ngOnInit() {
     this._editArea = this._el.querySelector('#editArea');
+    this._editArea.focus();
 
-    // const sk = new ShortcutKeyEvent(this._editArea);
-    // sk.copy()
-    //   .subscribe(value => console.log(value));
+    const sk = new ShortcutKey(this._editArea);
 
-    this.markdownService.observerResetMarkdown()
-      .subscribe(md => {
-        this._editArea.innerText = md;
-      });
     this.bindMdService();
     this.bindMutationObserver();
   }
@@ -42,13 +44,17 @@ export class EditBoxComponent implements OnInit {
   private bindMdService(): void {
     this.markdownService.observerResetMarkdown()
       .subscribe(md => {
-        this._editArea.textContent = md;
+        this.text = md;
       });
 
     this.markdownService
       .updateMarkdown(this.observeText(200));
   }
 
+  /**
+   * 观察文本的变化
+   * @param time - 延迟发出的时间
+   */
   private observeText(time?: number): Observable<string> {
     if (!time) {
       return this.mdSubject.asObservable();
@@ -65,7 +71,7 @@ export class EditBoxComponent implements OnInit {
    */
   private bindMutationObserver() {
     const _observer = new MutationObserver((mutations: Array<MutationRecord>, observer: MutationObserver) => {
-      this.mdSubject.next(this.getText());
+      this.mdSubject.next(this.text);
     });
 
     _observer.observe(this._editArea, {
@@ -74,9 +80,5 @@ export class EditBoxComponent implements OnInit {
       characterData: true,
       characterDataOldValue: true
     });
-  }
-
-  private getText(): string {
-    return this._editArea.innerText;
   }
 }

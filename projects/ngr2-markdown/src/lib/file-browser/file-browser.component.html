@@ -10,8 +10,8 @@
     </button>
     <!--创建文件夹暂时不可用-->
     <!--(click)="createFolder()"-->
-    <button class="fb-button fb-button_disable"
-            style="opacity: 0.5;"
+    <button class="fb-button fb-button_hover"
+            (click)="createFolder()"
     >
       <i class="material-icons md-dark">
         create_new_folder
@@ -41,20 +41,33 @@
   </header>
   <aside class="fb-list"
   >
-    <ul class="fb-ul"
-        #fileList
+    <nb-tree [dataSource]="fileTree"
     >
-      <li class="fb-li fb-li_hover" *ngFor="let article of articles"
-          (click)="select($any($event.currentTarget), article)"
-          (dblclick)="open($any($event.currentTarget), article)"
-      >
-        <i class="material-icons md-18 md-dark">
-          insert_drive_file
-        </i>
-        <span>
-          {{ article.title }}
-        </span>
-      </li>
-    </ul>
+      <nb-tree-node *nbTreeNodeDef="let data = data" [isExpanded]="data.isExpanded">
+        <li *ngIf="data.type === 'folder'"
+            class="fb-li_hover"
+            (click)="select($any($event.currentTarget), data)"
+            nbTreeNodeToggle
+            (callbackFn)="expanded($event)"
+        >
+          <i class="material-icons md-18 md-dark">
+            subdirectory_arrow_right
+          </i>
+          <span>{{ data.name }}</span>
+        </li>
+        <li *ngIf="data.type === 'article'" class="fb-li_hover"
+            (click)="select($any($event.currentTarget), data)"
+            (dblclick)="open($any($event.currentTarget), data)"
+        >
+          <i class="material-icons md-18 md-dark">
+            insert_drive_file
+          </i>
+          <span>{{ data.title }}</span>
+        </li>
+        <ul>
+          <ng-container nbTreeNodeOutlet></ng-container>
+        </ul>
+      </nb-tree-node>
+    </nb-tree>
   </aside>
 </div>

@@ -4,8 +4,8 @@ import { NgModule } from '@angular/core';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
-// import {Ngr2MarkdownModule} from '../../projects/ngr2-markdown/src/lib/ngr2-markdown.module';
-import {Ngr2MarkdownModule} from 'ngr2-markdown';
+import {Ngr2MarkdownModule} from '../../projects/ngr2-markdown/src/lib/ngr2-markdown.module';
+// import {Ngr2MarkdownModule} from 'ngr2-markdown';
 
 @NgModule({
   declarations: [

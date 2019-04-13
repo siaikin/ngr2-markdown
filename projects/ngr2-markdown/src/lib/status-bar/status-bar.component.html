@@ -1,1 +1,17 @@
-status bar
+<footer class="status-bar"
+>
+  <div class="status-bar_panel status-bar_panel-left"
+  >
+    <span class="status-bar_panel-name">Markdown</span>
+    <span><span class="status-bar_panel-value">{{ mdInfo.bytes }}</span>bytes</span>
+    <span><span class="status-bar_panel-value">{{ mdInfo.words }}</span>words</span>
+    <span><span class="status-bar_panel-value">{{ mdInfo.lines }}</span>lines</span>
+  </div>
+  <div class="status-bar_panel status-bar_panel-right"
+  >
+    <span class="status-bar_panel-name">HTML</span>
+    <span><span class="status-bar_panel-value">{{ htmlInfo.characters }}</span>characters</span>
+    <span><span class="status-bar_panel-value">{{ htmlInfo.words }}</span>words</span>
+    <span><span class="status-bar_panel-value">{{ htmlInfo.paragraphs }}</span>paragraphs</span>
+  </div>
+</footer>

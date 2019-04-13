@@ -5,7 +5,6 @@ import {MarkdownImpl, MarkdownOptionImpl} from '../core/markdown/markdown';
 import {FileOperatorImpl} from '../core/fileOperator';
 import {map} from 'rxjs/operators';
 import {TextParser} from '../utils/textParser';
-import {IndexedDB} from '../core/indexedDB/indexedDB';
 
 @Injectable({
   providedIn: 'root'
@@ -15,12 +14,12 @@ export class Ngr2MarkdownService {
   /**
    * 接收Markdown源文本
    */
-  private originMd: BehaviorSubject<string> = new BehaviorSubject<string>(null);
-  private resetMd: BehaviorSubject<string> = new BehaviorSubject<string>(null);
+  private originMd: BehaviorSubject<string> = new BehaviorSubject<string>('');
+  private resetMd: BehaviorSubject<string> = new BehaviorSubject<string>('');
   /**
    * 观察`originMd`通过`render`方法渲染出的HTML
    */
-  private renderMd: Observable<MarkdownContent>;
+  private renderMd: BehaviorSubject<MarkdownContent> = new BehaviorSubject(null);
   private _md: MarkdownImpl;
   /**
    * 当前浏览的标题的Subject, BehaviorSubject可支持多播(在多处订阅)
@@ -34,6 +33,7 @@ export class Ngr2MarkdownService {
    * 发送目录信息的Subject
    */
   TOCInfo: BehaviorSubject<TOCItem> = new BehaviorSubject<TOCItem>(null);
+  syncScroll: BehaviorSubject<HTMLElement> = new BehaviorSubject<HTMLElement>(null);
 
   constructor() {
     this._md = new MarkdownImpl();
@@ -55,15 +55,18 @@ export class Ngr2MarkdownService {
         this.TOCInfo.next(root);
       });
 
-    this.renderMd = this.originMd
+    this.originMd
       .pipe(
         map(mdText => {
+          const html = this.render(mdText);
           return {
             md:   mdText || null,
-            html: this.render(mdText)
+            html,
+            Markdown: TextParser.parseMD(mdText),
+            HTML: TextParser.parseHTML(html)
           };
         })
-      );
+      ).subscribe(this.renderMd);
 
     this.resetMd
       .subscribe(this.originMd);
@@ -106,13 +109,16 @@ export class Ngr2MarkdownService {
     return this.renderMd;
   }
 
+  /**
+   * 将Markdown原始文本渲染成HTML格式
+   * @param markdown
+   * @param options
+   */
   render(markdown: string, options?: MarkdownOptionImpl): string {
     if (!markdown) {
       markdown = '';
     }
     const html = this._md.render(markdown, options);
-    TextParser.parseMD(markdown);
-    TextParser.parseHTML(html);
     return html;
   }
 

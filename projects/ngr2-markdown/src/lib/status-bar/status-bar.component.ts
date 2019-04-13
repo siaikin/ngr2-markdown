@@ -1,4 +1,6 @@
 import { Component, OnInit } from '@angular/core';
+import {Ngr2MarkdownService} from '../service/ngr2-markdown.service';
+import {filter} from 'rxjs/operators';
 
 @Component({
   selector: 'nb-status-bar',
@@ -7,9 +9,19 @@ import { Component, OnInit } from '@angular/core';
 })
 export class StatusBarComponent implements OnInit {
 
-  constructor() { }
+  mdInfo;
+  htmlInfo;
+
+  constructor(private markdownService: Ngr2MarkdownService
+  ) {
+  }
 
   ngOnInit() {
+    this.markdownService.observeMarkdown()
+      .subscribe(allinfo => {
+        this.mdInfo   = allinfo.Markdown;
+        this.htmlInfo = allinfo.HTML;
+      });
   }
 
 }

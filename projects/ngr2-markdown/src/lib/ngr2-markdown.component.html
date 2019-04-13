@@ -17,15 +17,19 @@
     <nb-control-bar class="control-bar"
     >
     </nb-control-bar>
+    <!--disable: nbSyncScroll-->
     <article #markdownBody
-             [ngClass]="[_options.bodyClassName]"
-             [innerHTML]="_html | safe:'html'"
+             class="markdown-preview"
     >
+      <div [ngClass]="[_options.bodyClassName]"
+           [innerHTML]="_html"
+      >
+      </div>
     </article>
-    <nb-menu class="menu"
+    <nb-menu class="menu-wrapper"
     >
     </nb-menu>
   </div>
-  <nb-status-bar class="status-bar"
+  <nb-status-bar class="status-bar-wrapper"
   ></nb-status-bar>
 </div>

@@ -1,7 +1,7 @@
 import * as MarkdownIt from 'node_modules/markdown-it/dist/markdown-it.min.js';
 import { getLanguage, highlight } from 'highlight.js';
 import { DomSanitizer, BrowserModule } from '@angular/platform-browser';
-import { Injectable, Component, Directive, ElementRef, Pipe, Renderer2, ViewChild, Input, ViewEncapsulation, NgModule, defineInjectable } from '@angular/core';
+import { Injectable, Component, ElementRef, Directive, Pipe, Input, ViewChild, Renderer2, NgModule, ViewEncapsulation, defineInjectable } from '@angular/core';
 import { Observable, fromEvent, merge, BehaviorSubject, Subject, concat } from 'rxjs';
 import { map, distinctUntilChanged, filter, debounceTime, mergeMap, scan, tap, throttleTime } from 'rxjs/operators';
 
@@ -179,16 +179,14 @@ class FileOperatorImpl {
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
+// @dynamic
 class TextParser {
     /**
      * @private
-     * @param {?} text
+     * @param {?=} text
      * @return {?}
      */
-    static parse(text) {
-        if (!text) {
-            return;
-        }
+    static parse(text = '') {
         /** @type {?} */
         const words = (text.match(TextParser.WORDS) || []).length;
         /** @type {?} */
@@ -204,18 +202,19 @@ class TextParser {
             }
             bytes++;
         }
-        console.log({
+        return {
+            text: text,
             words: words,
             bytes: bytes,
             lines: lines
-        });
+        };
     }
     /**
      * @param {?} markdown
      * @return {?}
      */
     static parseMD(markdown) {
-        this.parse(markdown);
+        return this.parse(markdown);
     }
     /**
      * @param {?} html
@@ -223,11 +222,18 @@ class TextParser {
      */
     static parseHTML(html) {
         TextParser._DIV.innerHTML = html;
-        this.parse(TextParser._DIV.textContent);
+        /** @type {?} */
+        const result = this.parse(TextParser._DIV.textContent);
+        return {
+            text: result.text,
+            character: result.bytes,
+            words: result.words,
+            paragraphs: result.lines
+        };
     }
 }
 TextParser._DIV = document.createElement('DIV');
-TextParser.WORDS = new RegExp('/([a-zA-Z]+)|([\u4e00-\u9fa5])/g');
+TextParser.WORDS = new RegExp(/([a-zA-Z]+)|([\u4e00-\u9fa5])/g);
 
 /**
  * @fileoverview added by tsickle
@@ -287,9 +293,13 @@ class Ngr2MarkdownService {
          * @return {?}
          */
         mdText => {
+            /** @type {?} */
+            const html = this.render(mdText);
             return {
                 md: mdText || null,
-                html: this.render(mdText)
+                html,
+                Markdown: TextParser.parseMD(mdText),
+                HTML: TextParser.parseHTML(html)
             };
         })));
         this.resetMd
@@ -337,6 +347,7 @@ class Ngr2MarkdownService {
         return this.renderMd;
     }
     /**
+     * 将Markdown原始文本渲染成HTML格式
      * @param {?} markdown
      * @param {?=} options
      * @return {?}
@@ -347,8 +358,6 @@ class Ngr2MarkdownService {
         }
         /** @type {?} */
         const html = this._md.render(markdown, options);
-        TextParser.parseMD(markdown);
-        TextParser.parseHTML(html);
         return html;
     }
     /**
@@ -836,9 +845,9 @@ class Ngr2MarkdownComponent {
 Ngr2MarkdownComponent.decorators = [
     { type: Component, args: [{
                 selector: 'nb-ngr2-markdown',
-                template: "<div class=\"main-panel\"\r\n     [style.height]=\"_options.height\"\r\n     nbDragAndDrop\r\n>\r\n  <nb-tool-bar class=\"tool-bar\"\r\n  ></nb-tool-bar>\r\n  <div class=\"content-panel content-container\"\r\n       nbDragAndDrop\r\n  >\r\n    <nb-file-browser class=\"file-browser-wrapper\"\r\n    >\r\n    </nb-file-browser>\r\n    <nb-edit-box *ngIf=\"_options.mode === 'edit'\"\r\n                 [ngClass]=\"'editor'\"\r\n    >\r\n    </nb-edit-box>\r\n    <nb-control-bar class=\"control-bar\"\r\n    >\r\n    </nb-control-bar>\r\n    <article #markdownBody\r\n             [ngClass]=\"[_options.bodyClassName]\"\r\n             [innerHTML]=\"_html | safe:'html'\"\r\n    >\r\n    </article>\r\n    <nb-menu class=\"menu\"\r\n    >\r\n    </nb-menu>\r\n  </div>\r\n  <nb-status-bar class=\"status-bar\"\r\n  ></nb-status-bar>\r\n</div>\r\n",
+                template: "<div class=\"main-panel\"\r\n     [style.height]=\"_options.height\"\r\n     nbDragAndDrop\r\n>\r\n  <nb-tool-bar class=\"tool-bar\"\r\n  ></nb-tool-bar>\r\n  <div class=\"content-panel content-container\"\r\n       nbDragAndDrop\r\n  >\r\n    <nb-file-browser class=\"file-browser-wrapper\"\r\n    >\r\n    </nb-file-browser>\r\n    <nb-edit-box *ngIf=\"_options.mode === 'edit'\"\r\n                 [ngClass]=\"'editor'\"\r\n    >\r\n    </nb-edit-box>\r\n    <nb-control-bar class=\"control-bar\"\r\n    >\r\n    </nb-control-bar>\r\n    <article #markdownBody\r\n             [ngClass]=\"[_options.bodyClassName]\"\r\n             [innerHTML]=\"_html | safe:'html'\"\r\n    >\r\n    </article>\r\n    <nb-menu class=\"menu\"\r\n    >\r\n    </nb-menu>\r\n  </div>\r\n  <nb-status-bar class=\"status-bar-wrapper\"\r\n  ></nb-status-bar>\r\n</div>\r\n",
                 encapsulation: ViewEncapsulation.None,
-                styles: [".main-panel{position:relative;display:flex;flex-direction:column;flex:1 1 auto;box-sizing:border-box}.markdown-body{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;padding:45px;min-width:200px;height:100%}.editor{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;min-width:200px;height:auto;display:flex;flex-direction:column}.content-container{display:flex;flex-direction:row}.side-toc-container{flex:0 auto;max-width:200px}.tool-bar{flex:0 0 25px;background-color:#d3d3d3}.content-panel{flex:1 1 auto;background-color:#a9a9a9}.status-bar{flex:0 0 15px;background-color:gray}.file-browser-wrapper{flex:0 0 200px;background-color:#696969}.control-bar{overflow:auto;flex:0 0 25px;background-color:#faebd7}.menu{flex:0 0 200px;background-color:#778899}"]
+                styles: [".main-panel{position:relative;display:flex;flex-direction:column;flex:1 1 auto;box-sizing:border-box}.markdown-body{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;padding:45px;min-width:200px;height:100%}.editor{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;min-width:200px;height:auto;display:flex;flex-direction:column}.content-container{display:flex;flex-direction:row}.side-toc-container{flex:0 auto;max-width:200px}.tool-bar{flex:0 0 25px;background-color:#d3d3d3}.content-panel{flex:1 1 auto;background-color:#a9a9a9}.status-bar-wrapper{flex:0 0 20px;background-color:gray}.file-browser-wrapper{flex:0 0 200px;background-color:#696969}.control-bar{overflow:auto;flex:0 0 25px;background-color:#faebd7}.menu{flex:0 0 200px;background-color:#778899}"]
             }] }
 ];
 /** @nocollapse */
@@ -1046,6 +1055,235 @@ ToolBarComponent.propDecorators = {
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
+// @dynamic
+class ShortcutKeyEvent {
+    /**
+     * @param {?} el
+     * @param {?=} sKOpts
+     */
+    constructor(el, sKOpts = ShortcutKeyEvent.SHORTCUT_KEY_OPTIONS) {
+        this._el = el;
+        this.sKOpts = sKOpts;
+        this.observable = this.listenEvent('keydown');
+    }
+    /**
+     * 监听源事件
+     * @private
+     * @param {?} eventType
+     * @param {?=} options
+     * @return {?}
+     */
+    listenEvent(eventType, options) {
+        /** @type {?} */
+        const observable = fromEvent(this._el, eventType, options, (/**
+         * @param {?} args
+         * @return {?}
+         */
+        args => args));
+        return observable;
+    }
+    /**
+     * 根据`option`过滤数据流, 然后分发给具体的操作如: `Copy`, `Paste`等等
+     * @private
+     * @param {?} option
+     * @return {?}
+     */
+    dispatch(option) {
+        if (!option) {
+            return null;
+        }
+        return this.observable
+            .pipe(filter((/**
+         * @param {?} event
+         * @return {?}
+         */
+        event => event.shiftKey === (option.shortcutKey.shift || false) &&
+            event.ctrlKey === (option.shortcutKey.ctrl || false) &&
+            event.altKey === (option.shortcutKey.alt || false) &&
+            event.key === (option.shortcutKey.key || false))), map((/**
+         * @param {?} event
+         * @return {?}
+         */
+        event => {
+            if (option.preventDefault) {
+                event.preventDefault();
+            }
+            if (option.stopPropagation) {
+                event.stopPropagation();
+                event.cancelBubble = true;
+            }
+            return event;
+        })));
+    }
+    /**
+     * @private
+     * @param {?} observable
+     * @param {?} option
+     * @return {?}
+     */
+    eventOptions(observable, option) {
+        return observable
+            .pipe(map((/**
+         * @param {?} event
+         * @return {?}
+         */
+        event => {
+            if (option.preventDefault) {
+                event.preventDefault();
+            }
+            if (option.stopPropagation) {
+                event.stopPropagation();
+                event.cancelBubble = true;
+            }
+            return event;
+        })));
+    }
+    /**
+     * 观察指定操作
+     * @param {?} operateType
+     * @return {?}
+     */
+    specOprt(operateType) {
+        if (!operateType) {
+            return null;
+        }
+        return this.dispatch(this.sKOpts[operateType]);
+    }
+    /**
+     * @return {?}
+     */
+    copyOprt() {
+        return this.dispatch(this.sKOpts['Copy']);
+    }
+    /**
+     * @return {?}
+     */
+    selectAllOprt() {
+        return this.dispatch(this.sKOpts['Select All']);
+    }
+    /**
+     * @return {?}
+     */
+    pasteOprt() {
+        return this.dispatch(this.sKOpts['Paste']);
+    }
+    /**
+     * @return {?}
+     */
+    cutOprt() {
+        return this.dispatch(this.sKOpts['Cut']);
+    }
+    /**
+     * @return {?}
+     */
+    undoOprt() {
+        return this.dispatch(this.sKOpts['Undo']);
+    }
+    /**
+     * @return {?}
+     */
+    redoOprt() {
+        return this.dispatch(this.sKOpts['Redo']);
+    }
+}
+ShortcutKeyEvent.SHORTCUT_KEY_OPTIONS = {
+    'Select All': {
+        operateType: 'Select All',
+        shortcutKey: {
+            ctrl: true,
+            key: 'a'
+        },
+    },
+    'Copy': {
+        operateType: 'Copy',
+        shortcutKey: {
+            ctrl: true,
+            key: 'c'
+        },
+        preventDefault: true
+    },
+    'Paste': {
+        operateType: 'Paste',
+        shortcutKey: {
+            ctrl: true,
+            key: 'v'
+        }
+    },
+    'Cut': {
+        operateType: 'Cut',
+        shortcutKey: {
+            ctrl: true,
+            key: 'x'
+        },
+        preventDefault: true
+    },
+    'Undo': {
+        operateType: 'Undo',
+        shortcutKey: {
+            ctrl: true,
+            key: 'z'
+        }
+    },
+    'Redo': {
+        operateType: 'Redo',
+        shortcutKey: {
+            ctrl: true,
+            shift: true,
+            key: 'z'
+        }
+    }
+};
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+class ShortcutKey {
+    /**
+     * @param {?} el
+     */
+    constructor(el) {
+        this._el = (/** @type {?} */ (el));
+        this._sKEv = new ShortcutKeyEvent(this._el);
+        this._sKEv.copyOprt().subscribe(this.copy.bind(this));
+        this._sKEv.cutOprt().subscribe(this.cut.bind(this));
+    }
+    /**
+     * @param {?} ev
+     * @return {?}
+     */
+    copy(ev) {
+        /** @type {?} */
+        const selection = window.getSelection();
+        /** @type {?} */
+        const range = selection.getRangeAt(0);
+        if (selection.isCollapsed) {
+            range.setStart(range.startContainer, 0);
+            range.setEnd(range.endContainer, range.endContainer.textContent.length);
+        }
+        document.execCommand('copy');
+    }
+    /**
+     * @param {?} ev
+     * @return {?}
+     */
+    cut(ev) {
+        /** @type {?} */
+        const selection = window.getSelection();
+        /** @type {?} */
+        const range = selection.getRangeAt(0);
+        if (selection.isCollapsed) {
+            range.setStart(range.startContainer, 0);
+            range.setEnd(range.endContainer, range.endContainer.textContent.length);
+        }
+        document.execCommand('cut');
+    }
+}
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
 class EditBoxComponent {
     /**
      * @param {?} markdownService
@@ -1061,9 +1299,9 @@ class EditBoxComponent {
      */
     ngOnInit() {
         this._editArea = this._el.querySelector('#editArea');
-        // const sk = new ShortcutKeyEvent(this._editArea);
-        // sk.copy()
-        //   .subscribe(value => console.log(value));
+        this._editArea.focus();
+        /** @type {?} */
+        const sk = new ShortcutKey(this._editArea);
         this.markdownService.observerResetMarkdown()
             .subscribe((/**
          * @param {?} md
@@ -1861,22 +2099,39 @@ Article.CONTENT = '# Default Title';
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
 class StatusBarComponent {
-    constructor() { }
+    /**
+     * @param {?} markdownService
+     */
+    constructor(markdownService) {
+        this.markdownService = markdownService;
+    }
     /**
      * @return {?}
      */
     ngOnInit() {
+        this.markdownService.observeMarkdown()
+            .subscribe((/**
+         * @param {?} allinfo
+         * @return {?}
+         */
+        allinfo => {
+            this.mdInfo = allinfo.Markdown;
+            this.htmlInfo = allinfo.HTML;
+            console.log(allinfo);
+        }));
     }
 }
 StatusBarComponent.decorators = [
     { type: Component, args: [{
                 selector: 'nb-status-bar',
-                template: "status bar\r\n",
-                styles: [""]
+                template: "<footer class=\"status-bar\"\r\n>\r\n  <div class=\"status-bar_panel status-bar_panel-left\"\r\n  >\r\n    <span class=\"status-bar_panel-name\">Markdown</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ mdInfo.bytes }}</span>bytes</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ mdInfo.words }}</span>words</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ mdInfo.lines }}</span>lines</span>\r\n  </div>\r\n  <div class=\"status-bar_panel status-bar_panel-right\"\r\n  >\r\n    <span class=\"status-bar_panel-name\">HTML</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ htmlInfo.characters }}</span>characters</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ htmlInfo.words }}</span>words</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ htmlInfo.paragraphs }}</span>paragraphs</span>\r\n  </div>\r\n</footer>\r\n",
+                styles: [".status-bar{display:flex;justify-content:space-between;font-size:10px;background-color:#007acc;color:#fff;height:100%}.status-bar_panel{line-height:20px}.status-bar_panel-value{font-weight:700;margin-left:5px;margin-right:2px}.status-bar_panel-left{margin-left:210px}.status-bar_panel-right{margin-right:210px}"]
             }] }
 ];
 /** @nocollapse */
-StatusBarComponent.ctorParameters = () => [];
+StatusBarComponent.ctorParameters = () => [
+    { type: Ngr2MarkdownService }
+];
 
 /**
  * @fileoverview added by tsickle

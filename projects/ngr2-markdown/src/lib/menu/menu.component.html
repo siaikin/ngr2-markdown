@@ -1,1 +1,42 @@
-menu
+<div class="menu">
+  <header class="mu-header">
+    <span class="mu-title">MENU</span>
+  </header>
+  <aside class="mu-list">
+    <ul>
+      <li class="mu-li_hover"
+          (click)="downloadMarkdown()"
+      >
+        <i class="material-icons md-18 md-dark">
+          cloud_download
+        </i>
+        <div class="mu-item">
+          <span class="mu-item-title">Download Markdown</span>
+          <span class="mu-item-description">Download Markdown</span>
+        </div>
+      </li>
+      <li class="mu-li_hover"
+          (click)="downloadHTML()"
+      >
+        <i class="material-icons md-18 md-dark">
+          cloud_download
+        </i>
+        <div class="mu-item">
+          <span class="mu-item-title">Download HTML</span>
+          <span class="mu-item-description">Download HTML</span>
+        </div>
+      </li>
+      <li class="mu-li_hover"
+          (click)="downloadPDF()"
+      >
+        <i class="material-icons md-18 md-dark">
+          cloud_download
+        </i>
+        <div class="mu-item">
+          <span class="mu-item-title">Download PDF (Disable)</span>
+          <span class="mu-item-description">Download PDF</span>
+        </div>
+      </li>
+    </ul>
+  </aside>
+</div>

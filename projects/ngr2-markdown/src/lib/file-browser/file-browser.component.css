@@ -36,30 +36,29 @@
 
 .file-browser .fb-list {
   flex: 1 1 auto;
+  width: 200px;
+  overflow: auto;
 }
 
-.file-browser .fb-ul {
+.file-browser .fb-list ul {
   list-style: none;
-  margin: 0;
-  padding: 2px;
+  margin: 0 0 0 5px;
+  padding-left: 2px;
 }
 
-.file-browser .fb-li {
+.file-browser .fb-list li {
   display: flex;
   box-sizing: border-box;
-  font-size: 14px;
-  width: 190px;
+  font-size: 12px;
   padding: 2px;
   margin: 3px;
-  background-color: rgba(0, 0, 0, 0.05);
-  border-radius: 2px;
 }
 
 .file-browser .fb-li_hover:hover {
   background-color: rgba(0, 0, 0, 0.1);
 }
 
-.file-browser .fb-li span {
+.file-browser .fb-list li span {
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -75,11 +74,12 @@
 
 .file-browser .fb-li_create {
   background-color: white;
+  width: 170px;
 }
 
 .file-browser .fb-li_create-input {
   box-sizing: padding-box;
-  width: 163px;
+  width: 100%;
   padding: 0 0 0 5px;
   outline: none;
   border: none;

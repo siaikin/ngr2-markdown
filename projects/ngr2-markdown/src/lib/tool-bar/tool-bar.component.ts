@@ -1,4 +1,4 @@
-import {Component, ElementRef, OnDestroy, OnInit, ViewChild} from '@angular/core';
+import {Component, OnDestroy, OnInit} from '@angular/core';
 import {Ngr2MarkdownService} from '../service/ngr2-markdown.service';
 import {Subscription} from 'rxjs';
 import {FileOperatorImpl} from '../core/fileOperator';
@@ -9,7 +9,7 @@ import {FileOperatorImpl} from '../core/fileOperator';
   styleUrls: ['./tool-bar.component.css']
 })
 export class ToolBarComponent implements OnInit, OnDestroy {
-  @ViewChild('download', {read: ElementRef}) download: ElementRef;
+
   mdHref: string;
   htmlHref: string;
   title: string;

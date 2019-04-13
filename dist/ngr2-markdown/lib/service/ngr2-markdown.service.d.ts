@@ -46,6 +46,11 @@ export declare class Ngr2MarkdownService {
      * markdown文本更新后, 发出消息
      */
     observeMarkdown(): Observable<MarkdownContent>;
+    /**
+     * 将Markdown原始文本渲染成HTML格式
+     * @param markdown
+     * @param options
+     */
     render(markdown: string, options?: MarkdownOptionImpl): string;
     /**
      * 设置当前浏览的标题

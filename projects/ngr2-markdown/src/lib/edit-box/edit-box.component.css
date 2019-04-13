@@ -11,8 +11,11 @@
 
 /* 可编辑内容占据剩余的空间 */
 .edit-content {
-  flex: auto;
+  flex: 1 1 auto;
   overflow: auto;
+}
+
+.edit-area {
   /* 不可分割单词强制换行 */
   overflow-wrap: break-word;
   outline: none;

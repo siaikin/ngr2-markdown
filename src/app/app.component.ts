@@ -1,5 +1,6 @@
 import {AfterViewChecked, AfterViewInit, Component} from '@angular/core';
 import {Ngr2MarkdownService} from '../../projects/ngr2-markdown/src/lib/service/ngr2-markdown.service';
+import {Tree} from '../../projects/ngr2-markdown/src/lib/core/tree/tree';
 
 @Component({
   selector: 'app-root',
@@ -84,7 +85,7 @@ cause=org.hibernate.PropertyNotFoundException: no appropriate constructor in cla
   constructor(
     private markdownService: Ngr2MarkdownService
   ) {
-    this.content = this.exampleText1;
+    markdownService.reinitialization(this.exampleText1);
   }
 
   ngAfterViewInit(): void {

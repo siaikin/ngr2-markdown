@@ -10,10 +10,10 @@
 * */
 
 import {
-  Component,
+  Component, DoCheck,
   ElementRef,
-  Input,
-  OnInit,
+  Input, OnChanges,
+  OnInit, SimpleChanges,
   ViewChild,
   ViewEncapsulation
 } from '@angular/core';
@@ -30,7 +30,7 @@ import {ParseUnit} from './utils/parseUnit';
   ],
   encapsulation: ViewEncapsulation.None
 })
-export class Ngr2MarkdownComponent implements OnInit {
+export class Ngr2MarkdownComponent implements OnInit, OnChanges, DoCheck {
   @ViewChild('markdownBody', {
     read: ElementRef
   }) markdownBody: ElementRef;
@@ -66,17 +66,24 @@ export class Ngr2MarkdownComponent implements OnInit {
   ) {
   }
 
+  ngOnChanges(changes: SimpleChanges): void {
+  }
+
+  ngDoCheck(): void {
+  }
+
   ngOnInit() {
     this.markdownService.observeMarkdown()
       .subscribe(value => {
         // 更新innerHTML
         this._html = value.html;
         // 重新初始化一些需要视图渲染结束才能获取的对象的值
-        this.reinitialization();
-        setTimeout(() => {
-          this.updateHeadingInfo();
-        });
+        // this.reinitialization();
+        // setTimeout(() => {
+        //   this.updateHeadingInfo();
+        // });
       });
+
     fromEvent(this.markdownBody.nativeElement, 'scroll')
       .pipe(
         filter(() => this.headingElementRef && this.headingElementRef.length > 0),
@@ -84,6 +91,8 @@ export class Ngr2MarkdownComponent implements OnInit {
         distinctUntilChanged()
       )
       .subscribe(this.markdownService.currentHeading);
+
+    // this.bindMutationObserver();
   }
 
   reinitialization() {
@@ -155,5 +164,19 @@ export class Ngr2MarkdownComponent implements OnInit {
 
   getComputedStyle(element: Element, property: string, pseudoElt?: string): string {
     return window.getComputedStyle(element, null).getPropertyValue(property);
+  }
+
+  private bindMutationObserver() {
+    const _observer = new MutationObserver((mutations: Array<MutationRecord>, observer: MutationObserver) => {
+      console.log('asd');
+      this.markdownBody.nativeElement.scrollTop = 100;
+    });
+
+    _observer.observe(this.markdownBody.nativeElement, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      characterDataOldValue: true
+    });
   }
 }

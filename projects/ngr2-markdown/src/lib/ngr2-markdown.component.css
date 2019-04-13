@@ -9,14 +9,15 @@
 }
 
 /* 预览框 */
-.markdown-body {
+.markdown-preview {
   flex: 1;
   overflow-y: auto;
   box-sizing: border-box;
-  margin: 0 auto;
-  padding: 45px;
+  margin: 0;
+  padding: 20px;
   min-width: 200px;
   height: 100%;
+  background-color: white;
 }
 
 /* 编辑框 */
@@ -49,11 +50,10 @@
 
 .content-panel {
   flex: 1 1 auto;
-  background-color: darkgray;
 }
 
-.status-bar {
-  flex: 0 0 15px;
+.status-bar-wrapper {
+  flex: 0 0 20px;
   background-color: gray;
 }
 
@@ -68,7 +68,20 @@
   background-color: antiquewhite;
 }
 
-.menu {
-  flex: 0 0 200px;
+.menu-wrapper {
+  flex: 0 0 280px;
   background-color: lightslategray;
 }
+
+
+/* 设置滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: darkgray;
+}
+

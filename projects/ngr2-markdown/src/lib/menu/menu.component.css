@@ -1,0 +1,54 @@
+.menu {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: lightgray;
+}
+
+.mu-header {
+  flex: 0 0 30px;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.menu .mu-title {
+  line-height: 30px;
+  margin: 0 5px;
+}
+.mu-list {
+  flex: 1 1 auto;
+  width: 280px;
+  overflow: auto;
+}
+
+.mu-list ul {
+  list-style: none;
+  margin: 0 0 0 5px;
+  padding-left: 2px;
+}
+
+.mu-list li {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 10px;
+  margin: 3px;
+}
+
+.mu-li_hover:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.mu-item {
+  display: flex;
+  flex-direction: column;
+  margin-left: 10px;
+}
+.mu-item-title {
+  font-size: 16px;
+}
+
+.mu-item-description {
+  font-size: 12px;
+  color: gray;
+}

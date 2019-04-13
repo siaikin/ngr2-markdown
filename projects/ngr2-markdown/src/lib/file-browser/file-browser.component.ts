@@ -1,19 +1,28 @@
-import {Component, ElementRef, OnInit, Renderer2, ViewChild} from '@angular/core';
+import {Component, OnInit, Renderer2, ViewEncapsulation} from '@angular/core';
 import {Ngr2MarkdownService} from '../service/ngr2-markdown.service';
-import {IndexedDB, IndexedDBStore, IndexedDBStruct} from '../core/indexedDB/indexedDB';
+import {IndexedDB, IndexedDBEvent, IndexedDBEventType, IndexedDBStruct} from '../core/indexedDB/indexedDB';
+import {Tree, TreeableNode} from '../core/tree/tree';
+import {concatMap} from 'rxjs/operators';
+import {of} from 'rxjs';
+import {TreeNodeComponent} from '../tree/tree-node/tree-node.component';
 
 @Component({
   selector: 'nb-file-browser',
   templateUrl: './file-browser.component.html',
   styleUrls: [
     './file-browser.component.css'
-  ]
+  ],
+  encapsulation: ViewEncapsulation.None
 })
 export class FileBrowserComponent implements OnInit {
 
-  @ViewChild('fileList', { read: ElementRef }) fileList: ElementRef;
-
-  private inputArea: HTMLElement;
+  /**
+   * 输入框模板
+   */
+  private inputArea: HTMLInputElement;
+  /**
+   * 用于初始化的IndexedDB数据库结构
+   */
   private indexedDBStructs: Array<IndexedDBStruct> = [
     {
       name: 'markdown_article',
@@ -23,8 +32,8 @@ export class FileBrowserComponent implements OnInit {
       },
       indexes: [
         {
-          name: 'title',
-          keyPath: 'title',
+          name: 'parentId',
+          keyPath: 'parentId',
           options: {
             unique: false
           }
@@ -33,97 +42,145 @@ export class FileBrowserComponent implements OnInit {
     }
   ];
   private indexedDB: IndexedDB;
-  private selectedArticles: { [key: string]: {el: Element, data: Article} };
-  private fileListArea: Element;
-  private isConnect: boolean;
-  articles: Array<Article>;
+  /**
+   * 被选择的节点
+   */
+  private selectedNode: {el: Element, data: TreeableNode};
+  fileTree: Tree<TreeableNode>;
 
   constructor(private markdownService: Ngr2MarkdownService,
               private renderer: Renderer2
   ) {
-    const inputAreaLi: HTMLElement = renderer.createElement('LI');
+    // 创建输入框模板
+    const inputAreaLi: HTMLInputElement = renderer.createElement('LI');
     this.renderer.addClass(inputAreaLi, 'fb-li');
     this.renderer.addClass(inputAreaLi, 'fb-li_create');
-    // inputAreaLi.classList.add('fb-li', 'fb-li_create');
     const inputAreaI: HTMLElement = renderer.createElement('I');
     this.renderer.addClass(inputAreaI, 'material-icons');
     this.renderer.addClass(inputAreaI, 'md-18');
     this.renderer.addClass(inputAreaI, 'md-dark');
-    // inputAreaI.classList.add('material-icons', 'md-18', 'md-dark');
     this.renderer.appendChild(inputAreaI, this.renderer.createText('edit'));
     const inputAreaInput: HTMLElement = renderer.createElement('INPUT');
     this.renderer.addClass(inputAreaInput, 'fb-li_create-input');
-    // inputAreaDiv.classList.add('fb-li_create-input');
-    this.renderer.setAttribute(inputAreaInput, 'contenteditable', 'true');
     this.renderer.appendChild(inputAreaLi, inputAreaI);
     this.renderer.appendChild(inputAreaLi, inputAreaInput);
 
     this.inputArea = inputAreaLi;
-    /*tslint:disable-next-line*/
-    this.isConnect = false;
-    this.selectedArticles = {};
   }
 
   ngOnInit() {
+    // 获取数据库实例
     IndexedDB.instenceof('ngr2-markdown-db', this.indexedDBStructs)
       .subscribe(db => {
         this.indexedDB = db;
-        this.isConnect = true;
 
-        this.refreshArticles();
+        const store = this.indexedDB.getObjectStore('markdown_article', 'readwrite');
+        // 数据库为空默认插入两条数据
+        store.getCount()
+          .pipe(
+            concatMap(value => {
+              if (value.data === 0) {
+                return store.addAll([new Folder(), new Article()]);
+              }
+              return of(new IndexedDBEvent(IndexedDBEventType.COMPLETE, 1, 1));
+            })
+          )
+          .subscribe(value => {
+            this.refreshArticles();
+          });
       });
-    this.fileListArea = this.fileList.nativeElement;
   }
 
   createFile(): void {
+    const prtId = this.selectedNode &&
+      (this.selectedNode.data.type === 'folder' ? this.selectedNode.data.id : this.selectedNode.data.parentId) ||
+      null;
+    const parent = this.selectedNode &&
+      (this.selectedNode.data.type === 'folder' ?
+        this.selectedNode.el.parentElement.querySelector('ul') : this.selectedNode.el.parentElement.parentElement) ||
+      null;
+
     const cloneEl = this.inputArea.cloneNode(true);
+
+    if (!parent || !prtId || !cloneEl) { console.error('unable create file'); }
+
     this.renderer.listen(cloneEl, 'keyup', (ev: KeyboardEvent) => {
       switch (ev.code) {
         case 'Enter':
           this.indexedDB
             .getObjectStore('markdown_article', 'readwrite')
-            .add(new Article('ce', (<HTMLInputElement> ev.target).value))
+            .add(new Article(prtId, 'article', 'ce', (<HTMLInputElement> ev.target).value))
             .subscribe(value => {
               this.refreshArticles();
-              this.renderer.removeChild(this.fileListArea, cloneEl);
+              this.renderer.removeChild(parent, cloneEl);
             });
       }
     });
-    this.renderer.appendChild(this.fileListArea, cloneEl);
+    this.renderer.appendChild(parent, cloneEl);
+    (<HTMLElement> cloneEl).querySelector('input').focus();
   }
 
   createFolder(): void {
-    console.log('createFolder');
-  }
+    if (this.selectedNode.data.type !== 'folder') { return; }
 
-  rename(): void {
+    const prtId = this.selectedNode &&
+      this.selectedNode.data.id ||
+      null;
+    const parent = this.selectedNode &&
+      this.selectedNode.el.parentElement.querySelector('ul') ||
+      null;
+
     const cloneEl = this.inputArea.cloneNode(true);
-    const id = Object.getOwnPropertyNames(this.selectedArticles)[0];
-    const selected = this.selectedArticles[id];
+
+    if (!parent || !prtId || !cloneEl) { console.error('unable create folder'); }
+
     this.renderer.listen(cloneEl, 'keyup', (ev: KeyboardEvent) => {
       switch (ev.code) {
         case 'Enter':
-          selected.data.title = (<HTMLInputElement> ev.target).value;
           this.indexedDB
             .getObjectStore('markdown_article', 'readwrite')
-            .update(selected.data)
+            .add(new Folder(prtId, 'folder', (<HTMLInputElement> ev.target).value))
             .subscribe(value => {
               this.refreshArticles();
-              this.renderer.removeChild(this.fileListArea, cloneEl);
-              this.selectedArticles[id] = null;
+              this.renderer.removeChild(parent, cloneEl);
             });
       }
     });
-    this.fileListArea.replaceChild(cloneEl, selected.el);
+    this.renderer.appendChild(parent, cloneEl);
+    (<HTMLElement> cloneEl).querySelector('input').focus();
+  }
+
+  rename(): void {
+    const parent = (this.selectedNode && this.selectedNode.el.parentElement) ||
+      null;
+
+    const type = this.selectedNode.data.type;
+
+    const cloneEl = this.inputArea.cloneNode(true);
+
+    this.renderer.listen(cloneEl, 'keyup', (ev: KeyboardEvent) => {
+      switch (ev.code) {
+        case 'Enter':
+          const value = (<HTMLInputElement> ev.target).value;
+          this.selectedNode.data[type === 'folder' ? 'name' : 'title'] = value;
+          this.indexedDB
+            .getObjectStore('markdown_article', 'readwrite')
+            .update(this.selectedNode.data)
+            .subscribe(() => {
+              this.refreshArticles();
+              this.renderer.removeChild(parent, cloneEl);
+              this.selectedNode = null;
+            });
+      }
+    });
+    parent.replaceChild(cloneEl, this.selectedNode.el);
     (<HTMLElement> cloneEl.lastChild).focus();
   }
 
   delete(): void {
+    const children = this.fileTree.recursionChildNodes(this.selectedNode.data.id);
     this.indexedDB.getObjectStore('markdown_article', 'readwrite')
-      .deleteAll(
-        ...Object.getOwnPropertyNames(this.selectedArticles)
-          .map(value => this.selectedArticles[Number.parseInt(value, 10)].data.id)
-      )
+      .deleteAll(...children.map(value => value.id), this.selectedNode.data.id)
       .subscribe(value => this.refreshArticles());
   }
 
@@ -131,51 +188,96 @@ export class FileBrowserComponent implements OnInit {
     console.log('close');
   }
 
-  select(el: HTMLElement, article: Article): void {
+  select(el: HTMLElement, node: TreeableNode): void {
     console.log('select');
-    if (!this.selectedArticles[article.id.toString(10)]) {
-      this.selectedArticles[article.id.toString(10)] = {el, data: article};
-      el.classList.add('fb-li_selected');
+    if (this.selectedNode) {
+      if (this.selectedNode.el === el) {
+        this.selectedNode.el.classList.remove('fb-li_selected');
+        this.selectedNode = null;
+      } else {
+        el.classList.add('fb-li_selected');
+        this.selectedNode.el.classList.remove('fb-li_selected');
+        this.selectedNode = {el, data: node};
+      }
     } else {
-      this.selectedArticles[article.id.toString(10)] = null;
-      el.classList.remove('fb-li_selected');
+      el.classList.add('fb-li_selected');
+      this.selectedNode = {el, data: node};
     }
   }
 
-  open(el: HTMLElement, article: Article): void {
+  open(el: HTMLElement, node: TreeableNode): void {
     console.log('open');
-    this.markdownService.reinitialization(article.content);
+    this.markdownService.reinitialization(node.content);
+  }
+
+  expanded(treeNode: TreeNodeComponent) {
+    const data = <Folder> treeNode.data.data;
+    data.isExpanded = treeNode.isExpanded;
+    console.log(data);
+    this.indexedDB.getObjectStore('markdown_article', 'readwrite')
+      .update(data)
+      .subscribe(value => console.log(value));
   }
 
   private refreshArticles(): void {
     this.indexedDB.getObjectStore('markdown_article', 'readwrite')
-      .getAll<Article>()
+      .getAll<any>()
       .subscribe(value => {
-        this.articles = value.data;
+        if (value.type === IndexedDBEventType.COMPLETE) {
+          console.log(value);
+          this.fileTree = new Tree(value.data);
+        }
       });
   }
 }
 
-class Article {
+export class Article implements TreeableNode {
   static AUTHOR   = 'Author';
   static TITLE    = 'Default Title';
   static CONTENT  = '# Default Title';
 
   id: number;
+  parentId: number;
+  type: string;
   author: string;
   title: string;
   content: string;
   createTime: Date;
   lastModifiedTime: Date;
 
-  constructor(author: string  = Article.AUTHOR,
-              title: string   = Article.TITLE,
-              content: string = Article.CONTENT
+  constructor(parentId: number  = -1,
+              type: string      = 'article',
+              author: string    = Article.AUTHOR,
+              title: string     = Article.TITLE,
+              content: string   = Article.CONTENT,
   ) {
+    this.parentId         = parentId;
+    this.type             = type;
     this.author           = author;
     this.title            = title;
     this.content          = content;
     this.createTime       = new Date();
     this.lastModifiedTime = this.createTime;
+  }
+}
+
+export class Folder implements TreeableNode {
+  static NAME = 'folderName';
+
+  id: number;
+  parentId: number;
+  type: string;
+  name: string;
+  isExpanded: boolean;
+
+  constructor(parentId: number    = -1,
+              type: string        = 'folder',
+              name: string        = Folder.NAME,
+              isExpanded: boolean = true
+  ) {
+    this.parentId   = parentId;
+    this.type       = type;
+    this.name       = name;
+    this.isExpanded = isExpanded;
   }
 }

@@ -11,6 +11,11 @@ import { StatusBarComponent } from './status-bar/status-bar.component';
 import { ControlBarComponent } from './control-bar/control-bar.component';
 import { MenuComponent } from './menu/menu.component';
 import { DragAndDropDirective } from './drag-and-drop.directive';
+import { TreeComponent } from './tree/tree/tree.component';
+import { TreeNodeComponent } from './tree/tree-node/tree-node.component';
+import { TreeNodeDefDirective, TreeNodeOutletDirective } from './tree/tree-node-directive/tree-node-def.directive';
+import {TreeNodeToggleDirective} from './tree/tree-node-directive/tree-node-toggle.directive';
+import { SyncScrollDirective } from './sync-scroll/sync-scroll.directive';
 
 @NgModule({
   declarations: [
@@ -24,7 +29,13 @@ import { DragAndDropDirective } from './drag-and-drop.directive';
     StatusBarComponent,
     ControlBarComponent,
     MenuComponent,
-    DragAndDropDirective
+    DragAndDropDirective,
+    TreeComponent,
+    TreeNodeComponent,
+    TreeNodeDefDirective,
+    TreeNodeOutletDirective,
+    TreeNodeToggleDirective,
+    SyncScrollDirective
   ],
   imports: [
     BrowserModule
