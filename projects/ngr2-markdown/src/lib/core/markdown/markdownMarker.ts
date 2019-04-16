@@ -1,5 +1,6 @@
 import {ExtRenderInfo} from './markdwonRenderer';
 
+// @dynamic
 export class MarkdownMarker {
 
   static headingRegExp = new RegExp(/^\s*(#{1,6})\s+.*\s*$/);

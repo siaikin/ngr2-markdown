@@ -1,9 +1,9 @@
 import * as MarkdownIt from 'node_modules/markdown-it/dist/markdown-it.min.js';
 import { getLanguage, highlight } from 'highlight.js';
 import { DomSanitizer, BrowserModule } from '@angular/platform-browser';
-import { Injectable, Component, ElementRef, Directive, Pipe, Input, ViewChild, Renderer2, NgModule, ViewEncapsulation, defineInjectable } from '@angular/core';
-import { Observable, fromEvent, merge, BehaviorSubject, Subject, concat } from 'rxjs';
-import { map, distinctUntilChanged, filter, debounceTime, mergeMap, scan, tap, throttleTime } from 'rxjs/operators';
+import { Observable, fromEvent, merge, BehaviorSubject, Subject, concat, of } from 'rxjs';
+import { map, distinctUntilChanged, filter, debounceTime, mergeMap, scan, concatMap, tap, throttleTime } from 'rxjs/operators';
+import { Injectable, Directive, ElementRef, Component, ViewChild, ViewEncapsulation, Input, Pipe, Renderer2, HostListener, TemplateRef, ViewContainerRef, EventEmitter, Output, ContentChild, IterableDiffers, ContentChildren, NgModule, defineInjectable } from '@angular/core';
 
 /**
  * @fileoverview added by tsickle
@@ -225,8 +225,8 @@ class TextParser {
         /** @type {?} */
         const result = this.parse(TextParser._DIV.textContent);
         return {
-            text: result.text,
-            character: result.bytes,
+            text: html,
+            characters: result.bytes,
             words: result.words,
             paragraphs: result.lines
         };
@@ -244,8 +244,12 @@ class Ngr2MarkdownService {
         /**
          * 接收Markdown源文本
          */
-        this.originMd = new BehaviorSubject(null);
-        this.resetMd = new BehaviorSubject(null);
+        this.originMd = new BehaviorSubject('');
+        this.resetMd = new BehaviorSubject('');
+        /**
+         * 观察`originMd`通过`render`方法渲染出的HTML
+         */
+        this.renderMd = new BehaviorSubject(null);
         /**
          * 当前浏览的标题的Subject, BehaviorSubject可支持多播(在多处订阅)
          */
@@ -258,6 +262,8 @@ class Ngr2MarkdownService {
          * 发送目录信息的Subject
          */
         this.TOCInfo = new BehaviorSubject(null);
+        this.syncScroll = new BehaviorSubject(null);
+        this.currentFile = new BehaviorSubject(null);
         this._md = new MarkdownImpl();
         this._md.use(this.anchor)
             .subscribe((/**
@@ -287,7 +293,7 @@ class Ngr2MarkdownService {
             }
             this.TOCInfo.next(root);
         }));
-        this.renderMd = this.originMd
+        this.originMd
             .pipe(map((/**
          * @param {?} mdText
          * @return {?}
@@ -301,7 +307,7 @@ class Ngr2MarkdownService {
                 Markdown: TextParser.parseMD(mdText),
                 HTML: TextParser.parseHTML(html)
             };
-        })));
+        }))).subscribe(this.renderMd);
         this.resetMd
             .subscribe(this.originMd);
     }
@@ -411,15 +417,15 @@ class Ngr2MarkdownService {
         state => {
             /** @type {?} */
             const infoList = [];
-            state.tokens.map((/**
+            /** @type {?} */
+            let index = 0;
+            state.tokens.forEach((/**
              * @param {?} token
-             * @param {?} index
-             * @param {?} array
              * @return {?}
              */
-            (token, index, array) => {
+            (token) => {
                 if (token.type === 'heading_open') {
-                    token.attrJoin('id', array[index + 1].content);
+                    token.attrJoin('id', index++ + '-' + token.markup.length);
                     infoList.push({
                         content: token.attrGet('id'),
                         indentLevel: token.markup.length
@@ -491,206 +497,133 @@ class TOCItem {
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
-class ParseUnit {
+class SyncScroll {
     /**
-     * @param {?} str
-     * @param {?=} unitMap
-     * @param {?=} caseSensitive
+     * @param {?} el
+     * @param {?} suffix
+     * @param {?=} generateIdFun
+     */
+    constructor(el, suffix, generateIdFun = (/**
+     * @param {?} node
      * @return {?}
      */
-    static checkUnit(str, unitMap = ParseUnit.UNIT_MAP, caseSensitive) {
-        if (!unitMap || !str) {
-            return;
-        }
-        if (!caseSensitive) {
-            str = str.toLocaleLowerCase();
-        }
-        /** @type {?} */
-        let i;
-        /** @type {?} */
-        let isMatch = false;
-        for (i = str.length - 1; i >= 0; i--) {
-            /** @type {?} */
-            const ascii = str.charCodeAt(i);
-            if (ascii >= 48 && ascii <= 57) {
-                isMatch = unitMap.exist;
+    node => ((/** @type {?} */ (node))).id)) {
+        this._el = el;
+        this.suffix = suffix;
+        this.generateId = generateIdFun;
+        this.headingsInfo = [];
+    }
+    /**
+     * @param {?=} headingElType
+     * @param {?=} headingKeys
+     * @return {?}
+     */
+    syncScrollByHeading(headingElType = 'tag', headingKeys = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']) {
+        switch (headingElType) {
+            case 'class':
+                this.queryString = headingKeys.map((/**
+                 * @param {?} value
+                 * @return {?}
+                 */
+                value => '.' + value)).join(',');
                 break;
+            case 'tag':
+            default:
+                this.queryString = headingKeys.join(',');
+        }
+        this._update(this.queryString);
+    }
+    /**
+     * @return {?}
+     */
+    updateHeadingsInfo() {
+        this._update(this.queryString);
+    }
+    /**
+     * @param {?=} scrollTop
+     * @return {?}
+     */
+    currentHeading(scrollTop = this._el.scrollTop) {
+        if (this.headingsInfo) {
+            return this._curHeading(scrollTop);
+        }
+        return null;
+    }
+    /**
+     * @param {?} pairId
+     * @return {?}
+     */
+    getPairHeading(pairId) {
+        for (let i = 0; i < this.headingsInfo.length; i++) {
+            if (this.headingsInfo[i].pairId === pairId) {
+                return {
+                    headingInfo: this.headingsInfo[i],
+                    scrollTop: this._el.scrollTop
+                };
+            }
+        }
+        return null;
+    }
+    /**
+     * @private
+     * @param {?} scrollTop
+     * @return {?}
+     */
+    _curHeading(scrollTop) {
+        if (this.headingsInfo.length <= 0) {
+            return null;
+        }
+        /** @type {?} */
+        const el = this.headingsInfo.reduce((/**
+         * @param {?} previousValue
+         * @param {?} currentValue
+         * @return {?}
+         */
+        (previousValue, currentValue) => {
+            if (currentValue.offsetTop > scrollTop) {
+                return previousValue;
+            }
+            if ((scrollTop - previousValue.offsetTop) > (scrollTop - currentValue.offsetTop)) {
+                return currentValue;
             }
             else {
-                if (!unitMap.child[str[i]]) {
-                    break;
-                }
-                unitMap = unitMap.child[str[i]];
+                return previousValue;
             }
+        }));
+        return {
+            headingInfo: el,
+            scrollTop: scrollTop
+        };
+    }
+    /**
+     * @private
+     * @param {?} queryString
+     * @return {?}
+     */
+    _update(queryString) {
+        /** @type {?} */
+        const nodeList = this._el.querySelectorAll(queryString);
+        if (!nodeList || nodeList.length <= 0) {
+            return;
         }
-        return isMatch ? {
-            unit: str.substr(i + 1),
-            number: Number.parseInt(str.substr(0, i + 1), 10)
-        } : null;
+        this.headingsInfo = [];
+        for (let i = 0; i < nodeList.length; i++) {
+            /** @type {?} */
+            const curNode = (/** @type {?} */ (nodeList[i]));
+            /** @type {?} */
+            const nextNodeOffset = (i + 1) >= nodeList.length ? this._el.scrollHeight : ((/** @type {?} */ (nodeList[i + 1]))).offsetTop;
+            /** @type {?} */
+            const pairId = this.generateId(curNode, i, nodeList);
+            this.headingsInfo.push({
+                id: pairId + '-' + this.suffix,
+                pairId: pairId,
+                el: curNode,
+                offsetTop: curNode.offsetTop,
+                height: nextNodeOffset - curNode.offsetTop
+            });
+        }
     }
 }
-ParseUnit.UNIT_MAP = {
-    exist: false,
-    child: {
-        'b': {
-            exist: false,
-            child: {
-                'v': {
-                    exist: true,
-                    child: {}
-                }
-            }
-        },
-        'c': {
-            exist: false,
-            child: {
-                'i': {
-                    exist: true,
-                    child: {}
-                },
-                'p': {
-                    exist: true,
-                    child: {}
-                }
-            }
-        },
-        'h': {
-            exist: false,
-            child: {
-                'c': {
-                    exist: true,
-                    child: {}
-                },
-                'l': {
-                    exist: true,
-                    child: {
-                        'r': {
-                            exist: true,
-                            child: {}
-                        }
-                    }
-                },
-                'v': {
-                    exist: true,
-                    child: {}
-                }
-            }
-        },
-        'i': {
-            exist: false,
-            child: {
-                'v': {
-                    exist: true,
-                    child: {}
-                }
-            }
-        },
-        'm': {
-            exist: false,
-            child: {
-                'e': {
-                    exist: true,
-                    child: {
-                        'r': {
-                            exist: true,
-                            child: {}
-                        }
-                    }
-                },
-                'm': {
-                    exist: true,
-                    child: {}
-                },
-                'c': {
-                    exist: true,
-                    child: {}
-                }
-            }
-        },
-        'n': {
-            exist: false,
-            child: {
-                'i': {
-                    exist: true,
-                    child: {
-                        'm': {
-                            exist: false,
-                            child: {
-                                'v': {
-                                    exist: true,
-                                    child: {}
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        'p': {
-            exist: false,
-            child: {
-                'a': {
-                    exist: false,
-                    child: {
-                        'c': {
-                            exist: true,
-                            child: {}
-                        },
-                    }
-                },
-            }
-        },
-        'q': {
-            exist: true,
-            child: {}
-        },
-        't': {
-            exist: false,
-            child: {
-                'p': {
-                    exist: true,
-                    child: {}
-                }
-            }
-        },
-        'w': {
-            exist: false,
-            child: {
-                'v': {
-                    exist: true,
-                    child: {}
-                }
-            }
-        },
-        'x': {
-            exist: false,
-            child: {
-                'a': {
-                    exist: false,
-                    child: {
-                        'm': {
-                            exist: false,
-                            child: {
-                                'v': {
-                                    exist: true,
-                                    child: {}
-                                }
-                            }
-                        }
-                    }
-                },
-                'e': {
-                    exist: true,
-                    child: {}
-                },
-                'p': {
-                    exist: true,
-                    child: {}
-                }
-            }
-        }
-    }
-};
 
 /**
  * @fileoverview added by tsickle
@@ -721,6 +654,13 @@ class Ngr2MarkdownComponent {
      * @return {?}
      */
     ngOnInit() {
+        this.syncScroll = new SyncScroll(this.markdownBody.nativeElement, 'pre', (/**
+         * @param {?} node
+         * @param {?} index
+         * @return {?}
+         */
+        (node, index) => index + '-' + (((/** @type {?} */ (node))).tagName.charCodeAt(1) - 48)));
+        this.syncScroll.syncScrollByHeading();
         this.markdownService.observeMarkdown()
             .subscribe((/**
          * @param {?} value
@@ -729,125 +669,38 @@ class Ngr2MarkdownComponent {
         value => {
             // 更新innerHTML
             this._html = value.html;
+            // this.updateHeadingsInfo();
             // 重新初始化一些需要视图渲染结束才能获取的对象的值
-            this.reinitialization();
+            // this.reinitialization();
             setTimeout((/**
              * @return {?}
              */
             () => {
-                this.updateHeadingInfo();
+                this.syncScroll.updateHeadingsInfo();
             }));
         }));
         fromEvent(this.markdownBody.nativeElement, 'scroll')
             .pipe(filter((/**
          * @return {?}
          */
-        () => this.headingElementRef && this.headingElementRef.length > 0)), map((/**
+        () => this.syncScroll.headingsInfo && this.syncScroll.headingsInfo.length > 0)), map((/**
          * @return {?}
          */
-        () => this.markdownScroll())), distinctUntilChanged())
-            .subscribe(this.markdownService.currentHeading);
-    }
-    /**
-     * @return {?}
-     */
-    reinitialization() {
-        this.headingElementMarginTop = {};
-        // 初始化标题元素的数组
-        this.headingElementRef = [];
-        // 页面滚动到顶部
-        this.markdownBody.nativeElement.scrollTop = 0;
-        // 重置当前标题
-        this.markdownService.setCurrentHeading(null);
-    }
-    /**
-     * \@description <b>元素的位置用
-     * [getBoundingClientRect()]{\@link https://developer.mozilla.org/zh-CN/docs/Web/API/Element/getBoundingClientRect}获取,
-     * 这个方法得到的矩形不会包括元素的外边距(margin)</b>
-     * 如果想要在检测时包括外边距, 需要先获取到外边距
-     * markdown内容滚动时触发
-     * 基于父元素的顶部位置, 判断当前浏览的标题内容
-     * 选出标题元素(h1 ~ h6)的顶部在父元素(class=markdown)顶部之上或相等的元素, 作为当前浏览的标题
-     * @return {?}
-     */
-    markdownScroll() {
-        // 父元素顶部的坐标
-        /** @type {?} */
-        const baseOffsetTop = ((/** @type {?} */ (this.markdownBody.nativeElement))).getBoundingClientRect().top;
-        /** @type {?} */
-        let preRect;
-        /** @type {?} */
-        let curRect;
-        /** @type {?} */
-        let preMarginTop;
-        /** @type {?} */
-        let curMarginTop;
-        /** @type {?} */
-        const elem = this.headingElementRef.reduce((/**
-         * @param {?} previousValue
-         * @param {?} currentValue
+        () => this.syncScroll.currentHeading())), distinctUntilChanged())
+            .subscribe((/**
+         * @param {?} value
          * @return {?}
          */
-        (previousValue, currentValue) => {
-            preRect = previousValue.getBoundingClientRect();
-            curRect = currentValue.getBoundingClientRect();
-            preMarginTop = this.headingElementMarginTop[previousValue.id];
-            curMarginTop = this.headingElementMarginTop[currentValue.id];
-            // 过滤在顶部之下的标题
-            if (curRect.top - baseOffsetTop - curMarginTop > 0) {
-                return previousValue;
-            }
-            // 找到距离顶部最近的标题
-            if ((curRect.top - baseOffsetTop - curMarginTop) > (preRect.top - baseOffsetTop - preMarginTop)) {
-                return currentValue;
-            }
-            else {
-                return previousValue;
-            }
+        value => {
         }));
-        return elem.id;
-    }
-    /**
-     * 更新渲染后的html内容中的标题部分(h1 ~ h6)到headingElementRef
-     * @return {?}
-     */
-    updateHeadingInfo() {
-        /** @type {?} */
-        const nodeList = ((/** @type {?} */ (this.markdownBody.nativeElement))).querySelectorAll('h1, h2');
-        if (nodeList === undefined || nodeList === null) {
-            return;
-        }
-        this.headingElementRef.splice(0);
-        /** @type {?} */
-        const nodes = [];
-        for (let i = 0; i < nodeList.length; i++) {
-            /** @type {?} */
-            const value = (/** @type {?} */ (nodeList[i]));
-            // 提取element的样式
-            /** @type {?} */
-            const marginTop = this.getComputedStyle(value, 'margin-top');
-            this.headingElementMarginTop[value.id] = ParseUnit.checkUnit(marginTop).number;
-            nodes.push(value);
-        }
-        // Element.style.xxx只能读取行内样式
-        this.headingElementRef.push(...nodes);
-    }
-    /**
-     * @param {?} element
-     * @param {?} property
-     * @param {?=} pseudoElt
-     * @return {?}
-     */
-    getComputedStyle(element, property, pseudoElt) {
-        return window.getComputedStyle(element, null).getPropertyValue(property);
     }
 }
 Ngr2MarkdownComponent.decorators = [
     { type: Component, args: [{
                 selector: 'nb-ngr2-markdown',
-                template: "<div class=\"main-panel\"\r\n     [style.height]=\"_options.height\"\r\n     nbDragAndDrop\r\n>\r\n  <nb-tool-bar class=\"tool-bar\"\r\n  ></nb-tool-bar>\r\n  <div class=\"content-panel content-container\"\r\n       nbDragAndDrop\r\n  >\r\n    <nb-file-browser class=\"file-browser-wrapper\"\r\n    >\r\n    </nb-file-browser>\r\n    <nb-edit-box *ngIf=\"_options.mode === 'edit'\"\r\n                 [ngClass]=\"'editor'\"\r\n    >\r\n    </nb-edit-box>\r\n    <nb-control-bar class=\"control-bar\"\r\n    >\r\n    </nb-control-bar>\r\n    <article #markdownBody\r\n             [ngClass]=\"[_options.bodyClassName]\"\r\n             [innerHTML]=\"_html | safe:'html'\"\r\n    >\r\n    </article>\r\n    <nb-menu class=\"menu\"\r\n    >\r\n    </nb-menu>\r\n  </div>\r\n  <nb-status-bar class=\"status-bar-wrapper\"\r\n  ></nb-status-bar>\r\n</div>\r\n",
+                template: "<div class=\"main-panel\"\r\n     [style.height]=\"_options.height\"\r\n     nbDragAndDrop\r\n>\r\n  <nb-tool-bar class=\"tool-bar\"\r\n  ></nb-tool-bar>\r\n  <div class=\"content-panel content-container\"\r\n       nbDragAndDrop\r\n  >\r\n    <nb-file-browser class=\"file-browser-wrapper\"\r\n    >\r\n    </nb-file-browser>\r\n    <nb-edit-box *ngIf=\"_options.mode === 'edit'\"\r\n                 [ngClass]=\"'editor'\"\r\n    >\r\n    </nb-edit-box>\r\n    <nb-control-bar class=\"control-bar\"\r\n    >\r\n    </nb-control-bar>\r\n    <!--disable: nbSyncScroll-->\r\n    <article #markdownBody\r\n             class=\"markdown-preview\"\r\n             nbSyncScroll\r\n             [syncScrollInfo]=\"syncScroll\"\r\n    >\r\n      <div [ngClass]=\"[_options.bodyClassName]\"\r\n           [innerHTML]=\"_html | safe:'html'\"\r\n      >\r\n      </div>\r\n    </article>\r\n    <nb-menu class=\"menu-wrapper\"\r\n    >\r\n    </nb-menu>\r\n  </div>\r\n  <nb-status-bar class=\"status-bar-wrapper\"\r\n  ></nb-status-bar>\r\n</div>\r\n",
                 encapsulation: ViewEncapsulation.None,
-                styles: [".main-panel{position:relative;display:flex;flex-direction:column;flex:1 1 auto;box-sizing:border-box}.markdown-body{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;padding:45px;min-width:200px;height:100%}.editor{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;min-width:200px;height:auto;display:flex;flex-direction:column}.content-container{display:flex;flex-direction:row}.side-toc-container{flex:0 auto;max-width:200px}.tool-bar{flex:0 0 25px;background-color:#d3d3d3}.content-panel{flex:1 1 auto;background-color:#a9a9a9}.status-bar-wrapper{flex:0 0 20px;background-color:gray}.file-browser-wrapper{flex:0 0 200px;background-color:#696969}.control-bar{overflow:auto;flex:0 0 25px;background-color:#faebd7}.menu{flex:0 0 200px;background-color:#778899}"]
+                styles: [".main-panel{position:relative;display:flex;flex-direction:column;flex:1 1 auto;box-sizing:border-box}.markdown-preview{flex:1;overflow-y:auto;box-sizing:border-box;margin:0;padding:20px;min-width:200px;height:100%;background-color:#fff}.markdown-body{position:relative;margin-bottom:120px}.editor{flex:1;overflow-y:auto;box-sizing:border-box;margin:0 auto;min-width:200px;height:auto;display:flex;flex-direction:column}.content-container{display:flex;flex-direction:row}.side-toc-container{flex:0 auto;max-width:200px}.tool-bar{flex:0 0 25px;background-color:#d3d3d3}.content-panel{flex:1 1 auto}.status-bar-wrapper{flex:0 0 20px;background-color:gray}.file-browser-wrapper{flex:0 0 200px;background-color:#696969}.control-bar{overflow:auto;flex:0 0 10px;background-color:#faebd7}.menu-wrapper{flex:0 0 280px;background-color:#778899}::-webkit-scrollbar{width:6px;height:6px;background-color:transparent}::-webkit-scrollbar-thumb{background-color:#a9a9a9}"]
             }] }
 ];
 /** @nocollapse */
@@ -1047,236 +900,212 @@ ToolBarComponent.decorators = [
 ToolBarComponent.ctorParameters = () => [
     { type: Ngr2MarkdownService }
 ];
-ToolBarComponent.propDecorators = {
-    download: [{ type: ViewChild, args: ['download', { read: ElementRef },] }]
-};
 
 /**
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
 // @dynamic
-class ShortcutKeyEvent {
-    /**
-     * @param {?} el
-     * @param {?=} sKOpts
-     */
-    constructor(el, sKOpts = ShortcutKeyEvent.SHORTCUT_KEY_OPTIONS) {
-        this._el = el;
-        this.sKOpts = sKOpts;
-        this.observable = this.listenEvent('keydown');
+class MarkdownMarker {
+    constructor() {
     }
     /**
-     * 监听源事件
-     * @private
-     * @param {?} eventType
-     * @param {?=} options
+     * 判断是否符合Markdown规则
+     * @param {?} text - 要判断的字符串
      * @return {?}
      */
-    listenEvent(eventType, options) {
+    testMarks(text) {
+        if (MarkdownMarker.headingRegExp.test(text)) {
+            return MarkType.HEADING;
+        }
+        else if (MarkdownMarker.blockQuoteRegExp.test(text)) {
+            return MarkType.BLOCK_QUOTE;
+        }
+        else if (MarkdownMarker.listItemRegExp.test(text)) {
+            return MarkType.LIST_ITEM;
+        }
+        else if (MarkdownMarker.codeBlockRegExp.test(text)) {
+            return MarkType.CODE_BLOCK;
+        }
+        else {
+            return MarkType.DEFAULT;
+        }
+    }
+    /**
+     * 传入符合heading的字符串，返回解析的数据(`#`号个数)
+     * @param {?} text - heading字符串
+     * @return {?}
+     */
+    parseHeading(text) {
+        if (!text) {
+            return;
+        }
         /** @type {?} */
-        const observable = fromEvent(this._el, eventType, options, (/**
-         * @param {?} args
-         * @return {?}
-         */
-        args => args));
-        return observable;
-    }
-    /**
-     * 根据`option`过滤数据流, 然后分发给具体的操作如: `Copy`, `Paste`等等
-     * @private
-     * @param {?} option
-     * @return {?}
-     */
-    dispatch(option) {
-        if (!option) {
-            return null;
-        }
-        return this.observable
-            .pipe(filter((/**
-         * @param {?} event
-         * @return {?}
-         */
-        event => event.shiftKey === (option.shortcutKey.shift || false) &&
-            event.ctrlKey === (option.shortcutKey.ctrl || false) &&
-            event.altKey === (option.shortcutKey.alt || false) &&
-            event.key === (option.shortcutKey.key || false))), map((/**
-         * @param {?} event
-         * @return {?}
-         */
-        event => {
-            if (option.preventDefault) {
-                event.preventDefault();
-            }
-            if (option.stopPropagation) {
-                event.stopPropagation();
-                event.cancelBubble = true;
-            }
-            return event;
-        })));
-    }
-    /**
-     * @private
-     * @param {?} observable
-     * @param {?} option
-     * @return {?}
-     */
-    eventOptions(observable, option) {
-        return observable
-            .pipe(map((/**
-         * @param {?} event
-         * @return {?}
-         */
-        event => {
-            if (option.preventDefault) {
-                event.preventDefault();
-            }
-            if (option.stopPropagation) {
-                event.stopPropagation();
-                event.cancelBubble = true;
-            }
-            return event;
-        })));
-    }
-    /**
-     * 观察指定操作
-     * @param {?} operateType
-     * @return {?}
-     */
-    specOprt(operateType) {
-        if (!operateType) {
-            return null;
-        }
-        return this.dispatch(this.sKOpts[operateType]);
-    }
-    /**
-     * @return {?}
-     */
-    copyOprt() {
-        return this.dispatch(this.sKOpts['Copy']);
-    }
-    /**
-     * @return {?}
-     */
-    selectAllOprt() {
-        return this.dispatch(this.sKOpts['Select All']);
-    }
-    /**
-     * @return {?}
-     */
-    pasteOprt() {
-        return this.dispatch(this.sKOpts['Paste']);
-    }
-    /**
-     * @return {?}
-     */
-    cutOprt() {
-        return this.dispatch(this.sKOpts['Cut']);
-    }
-    /**
-     * @return {?}
-     */
-    undoOprt() {
-        return this.dispatch(this.sKOpts['Undo']);
-    }
-    /**
-     * @return {?}
-     */
-    redoOprt() {
-        return this.dispatch(this.sKOpts['Redo']);
+        let length;
+        length = MarkdownMarker.headingRegExp[Symbol.match](text)[1].length;
+        return {
+            headingLevel: length
+        };
     }
 }
-ShortcutKeyEvent.SHORTCUT_KEY_OPTIONS = {
-    'Select All': {
-        operateType: 'Select All',
-        shortcutKey: {
-            ctrl: true,
-            key: 'a'
-        },
-    },
-    'Copy': {
-        operateType: 'Copy',
-        shortcutKey: {
-            ctrl: true,
-            key: 'c'
-        },
-        preventDefault: true
-    },
-    'Paste': {
-        operateType: 'Paste',
-        shortcutKey: {
-            ctrl: true,
-            key: 'v'
-        }
-    },
-    'Cut': {
-        operateType: 'Cut',
-        shortcutKey: {
-            ctrl: true,
-            key: 'x'
-        },
-        preventDefault: true
-    },
-    'Undo': {
-        operateType: 'Undo',
-        shortcutKey: {
-            ctrl: true,
-            key: 'z'
-        }
-    },
-    'Redo': {
-        operateType: 'Redo',
-        shortcutKey: {
-            ctrl: true,
-            shift: true,
-            key: 'z'
-        }
-    }
+MarkdownMarker.headingRegExp = new RegExp(/^\s*(#{1,6})\s+.*\s*$/);
+MarkdownMarker.blockQuoteRegExp = new RegExp(/^\s*>.*/);
+MarkdownMarker.listItemRegExp = new RegExp(/^(\d+|[*+\-])\s.*/);
+MarkdownMarker.codeBlockRegExp = new RegExp(/^`{1,3}\w*$/);
+/** @enum {string} */
+const MarkType = {
+    HEADING: 'heading',
+    BLOCK_QUOTE: 'block quote',
+    LIST_ITEM: 'list item',
+    CODE_BLOCK: 'code block',
+    CODE_INLINE: 'code inline',
+    NOTHING: 'nothing',
+    DEFAULT: 'default',
 };
 
 /**
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
-class ShortcutKey {
-    /**
-     * @param {?} el
-     */
-    constructor(el) {
-        this._el = (/** @type {?} */ (el));
-        this._sKEv = new ShortcutKeyEvent(this._el);
-        this._sKEv.copyOprt().subscribe(this.copy.bind(this));
-        this._sKEv.cutOprt().subscribe(this.cut.bind(this));
+class MarkdownRenderer {
+    constructor() {
     }
     /**
-     * @param {?} ev
+     * 渲染`Range`
+     * @param {?} range - 要渲染的`Range`
+     * @param {?} type - 渲染的类型
+     * @param {?=} extra - 额外信息
      * @return {?}
      */
-    copy(ev) {
-        /** @type {?} */
-        const selection = window.getSelection();
-        /** @type {?} */
-        const range = selection.getRangeAt(0);
-        if (selection.isCollapsed) {
-            range.setStart(range.startContainer, 0);
-            range.setEnd(range.endContainer, range.endContainer.textContent.length);
-        }
-        document.execCommand('copy');
+    renderRange(range, type, extra) {
+        this.curRange = range;
+        return this.renderEl(this._getRangeEl(range), type, extra);
     }
     /**
-     * @param {?} ev
+     * 渲染`HTMLElement`
+     * @param {?} el - 要渲染的`HTMLElement`
+     * @param {?} type - 渲染类型
+     * @param {?=} extra - 额外信息
      * @return {?}
      */
-    cut(ev) {
-        /** @type {?} */
-        const selection = window.getSelection();
-        /** @type {?} */
-        const range = selection.getRangeAt(0);
-        if (selection.isCollapsed) {
-            range.setStart(range.startContainer, 0);
-            range.setEnd(range.endContainer, range.endContainer.textContent.length);
+    renderEl(el, type, extra) {
+        this.curEl = el;
+        switch (type) {
+            case MarkType.HEADING:
+                this._heading(extra);
+                break;
+            // case MarkType.BLOCK_QUOTE:
+            //   this._blockQuote(extra);
+            //   break;
+            // case MarkType.LIST_ITEM:
+            //   this._listItem(extra);
+            //   break;
+            // case MarkType.CODE_BLOCK:
+            //   this._codeBlock(extra);
+            //   break;
+            // case MarkType.CODE_INLINE:
+            //   this._codeInline(extra);
+            //   break;
+            case MarkType.DEFAULT:
+            default:
+                this._default(extra);
+                break;
         }
-        document.execCommand('cut');
+    }
+    /**
+     * @private
+     * @param {?=} extra
+     * @return {?}
+     */
+    _heading(extra) {
+        /** @type {?} */
+        const level = extra && extra.headingLevel || 1;
+        if (this.curEl.className === 'h' + level) {
+            return;
+        }
+        this.curEl.className = 'h' + level;
+    }
+    /**
+     * @private
+     * @param {?=} extra
+     * @return {?}
+     */
+    _blockQuote(extra) {
+        if (this.curEl.className === 'blockquote') {
+            return;
+        }
+        this.curEl.className = 'blockquote';
+    }
+    /**
+     * @private
+     * @param {?=} extra
+     * @return {?}
+     */
+    _listItem(extra) {
+        if (this.curEl.className === 'li') {
+            return;
+        }
+        this.curEl.className = 'li';
+    }
+    /**
+     * @private
+     * @param {?=} extra
+     * @return {?}
+     */
+    _codeBlock(extra) {
+        if (this.curEl.className === 'code') {
+            return;
+        }
+        if (this.curEl.parentElement.className !== 'pre') {
+            this.curEl.className = 'pre';
+            /** @type {?} */
+            const offset = this.curRange.startOffset;
+            /** @type {?} */
+            const parEl = document.createElement('DIV');
+            parEl.appendChild(this.curRange.startContainer);
+            parEl.className = 'code';
+            this.curEl.appendChild(parEl);
+            this.curRange.setStart(parEl, offset);
+        }
+        else {
+            this.curEl.className = 'code';
+        }
+    }
+    /**
+     * @private
+     * @param {?=} extra
+     * @return {?}
+     */
+    _codeInline(extra) {
+    }
+    /**
+     * @private
+     * @param {?=} extra
+     * @return {?}
+     */
+    _default(extra) {
+        if (this.curEl.className !== 'p') {
+            this.curEl.className = 'p';
+        }
+    }
+    /**
+     * 获取Range的所在的元素节点(非文本节点)
+     * @private
+     * @param {?} range - range
+     * @return {?}
+     */
+    _getRangeEl(range) {
+        /** @type {?} */
+        const startEl = range.startContainer;
+        /** @type {?} */
+        let el;
+        if (startEl.nodeType === Node.TEXT_NODE) {
+            el = startEl.parentElement;
+        }
+        else if (startEl.nodeType === Node.ELEMENT_NODE) {
+            el = (/** @type {?} */ (startEl));
+        }
+        return el;
     }
 }
 
@@ -1287,31 +1116,100 @@ class ShortcutKey {
 class EditBoxComponent {
     /**
      * @param {?} markdownService
-     * @param {?} el
      */
-    constructor(markdownService, el) {
+    constructor(markdownService) {
         this.markdownService = markdownService;
-        this.mdSubject = new Subject();
-        this._el = el.nativeElement;
+        this.contentChange = new Subject();
+    }
+    /**
+     * @private
+     * @return {?}
+     */
+    get _range() { return this._selection.getRangeAt(0); }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set content(value) {
+        if (!value || value.length <= 0) {
+            this._editArea.innerHTML = '<div><br></div>';
+        }
+        else {
+            this._editArea.innerText = value;
+        }
+    }
+    /**
+     * @return {?}
+     */
+    get content() {
+        console.log({
+            before: this._editArea.innerText,
+            after: this._editArea.innerText.replace(/\n\n/g, '\n')
+        });
+        return this._editArea.innerText.replace(/\n\n/g, '\n');
     }
     /**
      * @return {?}
      */
     ngOnInit() {
-        this._editArea = this._el.querySelector('#editArea');
+        this._editArea = this.editAreaRef.nativeElement;
         this._editArea.focus();
-        /** @type {?} */
-        const sk = new ShortcutKey(this._editArea);
-        this.markdownService.observerResetMarkdown()
-            .subscribe((/**
-         * @param {?} md
+        this._selection = document.getSelection();
+        this.syncScroll = new SyncScroll(this.editWindowRef.nativeElement, 'edit', (/**
+         * @param {?} node
+         * @param {?} index
          * @return {?}
          */
-        md => {
-            this._editArea.innerText = md;
-        }));
+        (node, index) => index + '-' + (((/** @type {?} */ (node))).className.charCodeAt(1) - 48)));
+        this.syncScroll.syncScrollByHeading('class');
+        // const sk = new ShortcutKey(this._editArea);
+        this.marker = new MarkdownMarker();
+        this.renderer = new MarkdownRenderer();
         this.bindMdService();
         this.bindMutationObserver();
+    }
+    /**
+     * @param {?} event
+     * @return {?}
+     */
+    keyUp(event) {
+        /** @type {?} */
+        const text = this._range.startContainer.textContent;
+        /** @type {?} */
+        const type = this.marker.testMarks(text);
+        switch (type) {
+            case MarkType.HEADING:
+                this.renderer.renderRange(this._range, type, this.marker.parseHeading(text));
+                break;
+            default:
+                this.renderer.renderRange(this._range, type);
+                break;
+        }
+    }
+    /**
+     * @param {?} event
+     * @return {?}
+     */
+    paste(event) {
+        /** @type {?} */
+        const text = event.clipboardData.getData('text');
+        document.execCommand('insertText', false, text);
+        /** @type {?} */
+        const children = this._editArea.children;
+        for (let i = 0; i < children.length; i++) {
+            /** @type {?} */
+            const type = this.marker.testMarks(children[i].textContent);
+            switch (type) {
+                case MarkType.HEADING:
+                    this.renderer.renderEl((/** @type {?} */ (children[i])), type, this.marker.parseHeading(children[i].textContent));
+                    break;
+                default:
+                    this.renderer.renderEl((/** @type {?} */ (children[i])), type);
+                    break;
+            }
+        }
+        this.syncScroll.updateHeadingsInfo();
+        event.preventDefault();
     }
     /**
      * 订阅MarkdownService的一些Subject/Observable
@@ -1319,31 +1217,51 @@ class EditBoxComponent {
      * @return {?}
      */
     bindMdService() {
+        // 订阅重置事件
         this.markdownService.observerResetMarkdown()
             .subscribe((/**
          * @param {?} md
          * @return {?}
          */
         md => {
-            this._editArea.textContent = md;
+            this._editArea.innerHTML = '<div><br></div>';
+            this._editArea.focus();
+            document.execCommand('insertText', false, md);
+            /** @type {?} */
+            const children = this._editArea.children;
+            for (let i = 0; i < children.length; i++) {
+                /** @type {?} */
+                const type = this.marker.testMarks(children[i].textContent);
+                switch (type) {
+                    case MarkType.HEADING:
+                        this.renderer.renderEl((/** @type {?} */ (children[i])), type, this.marker.parseHeading(children[i].textContent));
+                        break;
+                    default:
+                        this.renderer.renderEl((/** @type {?} */ (children[i])), type);
+                        break;
+                }
+            }
+            this.syncScroll.updateHeadingsInfo();
+            // this.content = md;
         }));
         this.markdownService
             .updateMarkdown(this.observeText(200));
     }
     /**
+     * 观察文本的变化
      * @private
-     * @param {?=} time
+     * @param {?=} time - 延迟发出的时间
      * @return {?}
      */
     observeText(time) {
         if (!time) {
-            return this.mdSubject.asObservable();
+            return this.contentChange.asObservable();
         }
-        return this.mdSubject
+        return this.contentChange
             .pipe(distinctUntilChanged(), debounceTime(time));
     }
     /**
-     * 绑定并开启MutationObserver, 触发时将markdown文本发送到`mdSubject`
+     * 绑定并开启MutationObserver, 触发时将markdown文本发送到`mdChange`
      * @private
      * @return {?}
      */
@@ -1355,35 +1273,33 @@ class EditBoxComponent {
          * @return {?}
          */
         (mutations, observer) => {
-            this.mdSubject.next(this.getText());
+            this.syncScroll.updateHeadingsInfo();
+            this.contentChange.next(this.content);
         }));
         _observer.observe(this._editArea, {
             subtree: true,
             childList: true,
             characterData: true,
-            characterDataOldValue: true
+            attributes: true
         });
-    }
-    /**
-     * @private
-     * @return {?}
-     */
-    getText() {
-        return this._editArea.innerText;
     }
 }
 EditBoxComponent.decorators = [
     { type: Component, args: [{
                 selector: 'nb-edit-box',
-                template: "<div class=\"edit-box\"\r\n>\r\n  <!-- tool bar -->\r\n  <!-- \u5DE5\u5177\u680F \u6269\u5C55\u7528 -->\r\n  <div class=\"edit-tool-bar\"\r\n  >\r\n    edit tool bar\r\n  </div>\r\n  <!-- edit content -->\r\n  <!-- \u7F16\u8F91\u6846 -->\r\n  <div id=\"editArea\"\r\n       class=\"edit-content\"\r\n       contenteditable=\"true\"\r\n  >\r\n  </div>\r\n</div>\r\n",
-                styles: [".edit-box{display:flex;flex-direction:column;height:100%}.edit-tool-bar{flex:0 0 25px}.edit-content{flex:auto;overflow:auto;overflow-wrap:break-word;outline:0;padding:20px;background-color:#fff}"]
+                template: "<div class=\"edit-box\"\r\n>\r\n  <!-- tool bar -->\r\n  <!-- \u5DE5\u5177\u680F \u6269\u5C55\u7528 -->\r\n  <div class=\"edit-tool-bar\"\r\n  >\r\n    edit tool bar\r\n  </div>\r\n  <!-- edit content -->\r\n  <!-- \u7F16\u8F91\u6846 -->\r\n  <!--disable: nbSyncScroll-->\r\n  <div #editWindow\r\n       class=\"edit-content\"\r\n       nbSyncScroll\r\n       [syncScrollInfo]=\"syncScroll\"\r\n  >\r\n    <div #editArea\r\n         class=\"edit-area\"\r\n         contenteditable=\"true\"\r\n         (keyup)=\"keyUp($event)\"\r\n         (paste)=\"paste($event)\"\r\n    >\r\n    </div>\r\n  </div>\r\n</div>\r\n",
+                encapsulation: ViewEncapsulation.None,
+                styles: [".edit-box{display:flex;flex-direction:column;height:100%}.edit-tool-bar{flex:0 0 25px}.edit-content{flex:1 1 auto;overflow:auto}.edit-area{position:relative;overflow-wrap:break-word;outline:0;box-sizing:border-box;min-height:100%;padding:10px 10px 120px;background-color:#fff}"]
             }] }
 ];
 /** @nocollapse */
 EditBoxComponent.ctorParameters = () => [
-    { type: Ngr2MarkdownService },
-    { type: ElementRef }
+    { type: Ngr2MarkdownService }
 ];
+EditBoxComponent.propDecorators = {
+    editAreaRef: [{ type: ViewChild, args: ['editArea', { read: ElementRef },] }],
+    editWindowRef: [{ type: ViewChild, args: ['editWindow', { read: ElementRef },] }]
+};
 
 /**
  * @fileoverview added by tsickle
@@ -1862,6 +1778,109 @@ const IndexedDBEventType = {
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
+/**
+ * @template T
+ */
+class Tree {
+    /**
+     * @param {?} nodes
+     */
+    constructor(nodes) {
+        this.nodes = nodes;
+        this.nodeMap = {};
+        this.initMap();
+        this.rootNode = this.generateTree();
+    }
+    /**
+     * 生成key: 父节点id, value: 父节点id为key的节点的Map
+     * @private
+     * @return {?}
+     */
+    initMap() {
+        for (let i = 0; i < this.nodes.length; i++) {
+            /** @type {?} */
+            const node = this.nodes[i];
+            if (!this.nodeMap[node.parentId]) {
+                this.nodeMap[node.parentId] = [];
+            }
+            this.nodeMap[node.parentId].push(node);
+        }
+    }
+    /**
+     * @private
+     * @param {?=} id
+     * @param {?=} data
+     * @param {?=} parentId
+     * @param {?=} type
+     * @return {?}
+     */
+    generateTree(id = -1, data, parentId = -1, type = 'root') {
+        /** @type {?} */
+        const node = new TreeNode();
+        node.id = id;
+        node.data = data;
+        node.parentId = parentId;
+        node.type = type;
+        node.children = [];
+        /** @type {?} */
+        const children = this.nodeMap[id];
+        if (!children) {
+            return node;
+        }
+        for (let i = 0; i < children.length; i++) {
+            node.push(this.generateTree(children[i].id, children[i], id, children[i].type));
+        }
+        return node;
+    }
+    /**
+     * @param {?} parentId
+     * @return {?}
+     */
+    recursionChildNodes(parentId) {
+        if (!this.nodeMap[parentId]) {
+            return [];
+        }
+        /** @type {?} */
+        const arr = [];
+        for (let i = 0; i < this.nodeMap[parentId].length; i++) {
+            /** @type {?} */
+            const node = this.nodeMap[parentId][i];
+            arr.push(node);
+            arr.push(...this.recursionChildNodes(node.id));
+        }
+        return arr;
+    }
+}
+/**
+ * @template T
+ */
+class TreeNode {
+    /**
+     * @param {?=} id
+     * @param {?=} parentId
+     * @param {?=} type
+     * @param {?=} data
+     */
+    constructor(id, parentId, type, data) {
+        this.id = id;
+        this.parentId = parentId;
+        this.type = type;
+        this.data = data;
+    }
+    /**
+     * @param {?} node
+     * @return {?}
+     */
+    push(node) {
+        this.children.push(node);
+        return node;
+    }
+}
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
 class FileBrowserComponent {
     /**
      * @param {?} markdownService
@@ -1870,6 +1889,9 @@ class FileBrowserComponent {
     constructor(markdownService, renderer) {
         this.markdownService = markdownService;
         this.renderer = renderer;
+        /**
+         * 用于初始化的IndexedDB数据库结构
+         */
         this.indexedDBStructs = [
             {
                 name: 'markdown_article',
@@ -1879,8 +1901,8 @@ class FileBrowserComponent {
                 },
                 indexes: [
                     {
-                        name: 'title',
-                        keyPath: 'title',
+                        name: 'parentId',
+                        keyPath: 'parentId',
                         options: {
                             unique: false
                         }
@@ -1888,34 +1910,29 @@ class FileBrowserComponent {
                 ]
             }
         ];
+        // 创建输入框模板
         /** @type {?} */
         const inputAreaLi = renderer.createElement('LI');
         this.renderer.addClass(inputAreaLi, 'fb-li');
         this.renderer.addClass(inputAreaLi, 'fb-li_create');
-        // inputAreaLi.classList.add('fb-li', 'fb-li_create');
         /** @type {?} */
         const inputAreaI = renderer.createElement('I');
         this.renderer.addClass(inputAreaI, 'material-icons');
         this.renderer.addClass(inputAreaI, 'md-18');
         this.renderer.addClass(inputAreaI, 'md-dark');
-        // inputAreaI.classList.add('material-icons', 'md-18', 'md-dark');
         this.renderer.appendChild(inputAreaI, this.renderer.createText('edit'));
         /** @type {?} */
         const inputAreaInput = renderer.createElement('INPUT');
         this.renderer.addClass(inputAreaInput, 'fb-li_create-input');
-        // inputAreaDiv.classList.add('fb-li_create-input');
-        this.renderer.setAttribute(inputAreaInput, 'contenteditable', 'true');
         this.renderer.appendChild(inputAreaLi, inputAreaI);
         this.renderer.appendChild(inputAreaLi, inputAreaInput);
         this.inputArea = inputAreaLi;
-        /*tslint:disable-next-line*/
-        this.isConnect = false;
-        this.selectedArticles = {};
     }
     /**
      * @return {?}
      */
     ngOnInit() {
+        // 获取数据库实例
         IndexedDB.instenceof('ngr2-markdown-db', this.indexedDBStructs)
             .subscribe((/**
          * @param {?} db
@@ -1923,17 +1940,69 @@ class FileBrowserComponent {
          */
         db => {
             this.indexedDB = db;
-            this.isConnect = true;
-            this.refreshArticles();
+            /** @type {?} */
+            const store = this.indexedDB.getObjectStore('markdown_article', 'readwrite');
+            // 数据库为空默认插入两条数据
+            store.getCount()
+                .pipe(concatMap((/**
+             * @param {?} value
+             * @return {?}
+             */
+            value => {
+                if (value.data === 0) {
+                    return store.addAll([new Folder(), new Article()]);
+                }
+                return of(new IndexedDBEvent(IndexedDBEventType.COMPLETE, 1, 1));
+            })))
+                .subscribe((/**
+             * @param {?} value
+             * @return {?}
+             */
+            value => {
+                // 获取数据库中的所有文件
+                this.refreshArticles().then((/**
+                 * @return {?}
+                 */
+                () => {
+                    // 找到最近修改的Article
+                    /** @type {?} */
+                    const currentFile = this.fileTree.recursionChildNodes(-1)
+                        .filter((/**
+                     * @param {?} file
+                     * @return {?}
+                     */
+                    (file) => file.type !== 'folder'))
+                        .reduce((/**
+                     * @param {?} previousValue
+                     * @param {?} currentValue
+                     * @return {?}
+                     */
+                    (previousValue, currentValue) => previousValue.lastModifiedTime > currentValue.lastModifiedTime ? previousValue : currentValue));
+                    // 发送当前的Article
+                    this.markdownService.currentFile.next(currentFile);
+                    this.markdownService.reinitialization(((/** @type {?} */ (currentFile))).content);
+                }));
+            }));
         }));
-        this.fileListArea = this.fileList.nativeElement;
     }
     /**
      * @return {?}
      */
     createFile() {
         /** @type {?} */
+        const prtId = this.selectedNode &&
+            (this.selectedNode.data.type === 'folder' ? this.selectedNode.data.id : this.selectedNode.data.parentId) ||
+            null;
+        /** @type {?} */
+        const parent = this.selectedNode &&
+            (this.selectedNode.data.type === 'folder' ?
+                this.selectedNode.el.parentElement.querySelector('ul') : this.selectedNode.el.parentElement.parentElement) ||
+            null;
+        /** @type {?} */
         const cloneEl = this.inputArea.cloneNode(true);
+        if (!parent || !prtId || !cloneEl) {
+            console.error('unable create file');
+        }
         this.renderer.listen(cloneEl, 'keyup', (/**
          * @param {?} ev
          * @return {?}
@@ -1943,35 +2012,74 @@ class FileBrowserComponent {
                 case 'Enter':
                     this.indexedDB
                         .getObjectStore('markdown_article', 'readwrite')
-                        .add(new Article('ce', ((/** @type {?} */ (ev.target))).value))
+                        .add(new Article(prtId, 'article', 'ce', ((/** @type {?} */ (ev.target))).value))
                         .subscribe((/**
                      * @param {?} value
                      * @return {?}
                      */
                     value => {
                         this.refreshArticles();
-                        this.renderer.removeChild(this.fileListArea, cloneEl);
+                        this.renderer.removeChild(parent, cloneEl);
                     }));
             }
         }));
-        this.renderer.appendChild(this.fileListArea, cloneEl);
+        this.renderer.appendChild(parent, cloneEl);
+        ((/** @type {?} */ (cloneEl))).querySelector('input').focus();
     }
     /**
      * @return {?}
      */
     createFolder() {
-        console.log('createFolder');
+        if (this.selectedNode.data.type !== 'folder') {
+            return;
+        }
+        /** @type {?} */
+        const prtId = this.selectedNode &&
+            this.selectedNode.data.id ||
+            null;
+        /** @type {?} */
+        const parent = this.selectedNode &&
+            this.selectedNode.el.parentElement.querySelector('ul') ||
+            null;
+        /** @type {?} */
+        const cloneEl = this.inputArea.cloneNode(true);
+        if (!parent || !prtId || !cloneEl) {
+            console.error('unable create folder');
+        }
+        this.renderer.listen(cloneEl, 'keyup', (/**
+         * @param {?} ev
+         * @return {?}
+         */
+        (ev) => {
+            switch (ev.code) {
+                case 'Enter':
+                    this.indexedDB
+                        .getObjectStore('markdown_article', 'readwrite')
+                        .add(new Folder(prtId, 'folder', ((/** @type {?} */ (ev.target))).value))
+                        .subscribe((/**
+                     * @param {?} value
+                     * @return {?}
+                     */
+                    value => {
+                        this.refreshArticles();
+                        this.renderer.removeChild(parent, cloneEl);
+                    }));
+            }
+        }));
+        this.renderer.appendChild(parent, cloneEl);
+        ((/** @type {?} */ (cloneEl))).querySelector('input').focus();
     }
     /**
      * @return {?}
      */
     rename() {
         /** @type {?} */
+        const parent = (this.selectedNode && this.selectedNode.el.parentElement) ||
+            null;
+        /** @type {?} */
+        const type = this.selectedNode.data.type;
+        /** @type {?} */
         const cloneEl = this.inputArea.cloneNode(true);
-        /** @type {?} */
-        const id = Object.getOwnPropertyNames(this.selectedArticles)[0];
-        /** @type {?} */
-        const selected = this.selectedArticles[id];
         this.renderer.listen(cloneEl, 'keyup', (/**
          * @param {?} ev
          * @return {?}
@@ -1979,35 +2087,37 @@ class FileBrowserComponent {
         (ev) => {
             switch (ev.code) {
                 case 'Enter':
-                    selected.data.title = ((/** @type {?} */ (ev.target))).value;
+                    /** @type {?} */
+                    const value = ((/** @type {?} */ (ev.target))).value;
+                    this.selectedNode.data[type === 'folder' ? 'name' : 'title'] = value;
                     this.indexedDB
                         .getObjectStore('markdown_article', 'readwrite')
-                        .update(selected.data)
+                        .update(this.selectedNode.data)
                         .subscribe((/**
-                     * @param {?} value
                      * @return {?}
                      */
-                    value => {
+                    () => {
                         this.refreshArticles();
-                        this.renderer.removeChild(this.fileListArea, cloneEl);
-                        this.selectedArticles[id] = null;
+                        this.renderer.removeChild(parent, cloneEl);
+                        this.selectedNode = null;
                     }));
             }
         }));
-        this.fileListArea.replaceChild(cloneEl, selected.el);
+        parent.replaceChild(cloneEl, this.selectedNode.el);
         ((/** @type {?} */ (cloneEl.lastChild))).focus();
     }
     /**
      * @return {?}
      */
     delete() {
+        /** @type {?} */
+        const children = this.fileTree.recursionChildNodes(this.selectedNode.data.id);
         this.indexedDB.getObjectStore('markdown_article', 'readwrite')
-            .deleteAll(...Object.getOwnPropertyNames(this.selectedArticles)
-            .map((/**
+            .deleteAll(...children.map((/**
          * @param {?} value
          * @return {?}
          */
-        value => this.selectedArticles[Number.parseInt(value, 10)].data.id)))
+        value => value.id)), this.selectedNode.data.id)
             .subscribe((/**
          * @param {?} value
          * @return {?}
@@ -2022,50 +2132,108 @@ class FileBrowserComponent {
     }
     /**
      * @param {?} el
-     * @param {?} article
+     * @param {?} node
      * @return {?}
      */
-    select(el, article) {
-        console.log('select');
-        if (!this.selectedArticles[article.id.toString(10)]) {
-            this.selectedArticles[article.id.toString(10)] = { el, data: article };
-            el.classList.add('fb-li_selected');
+    select(el, node) {
+        if (this.selectedNode) {
+            if (this.selectedNode.el === el) {
+                this.selectedNode.el.classList.remove('fb-li_selected');
+                this.selectedNode = null;
+            }
+            else {
+                el.classList.add('fb-li_selected');
+                this.selectedNode.el.classList.remove('fb-li_selected');
+                this.selectedNode = { el, data: node };
+            }
         }
         else {
-            this.selectedArticles[article.id.toString(10)] = null;
-            el.classList.remove('fb-li_selected');
+            el.classList.add('fb-li_selected');
+            this.selectedNode = { el, data: node };
         }
+        console.log(this.selectedNode);
     }
     /**
      * @param {?} el
-     * @param {?} article
+     * @param {?} node
      * @return {?}
      */
-    open(el, article) {
-        console.log('open');
-        this.markdownService.reinitialization(article.content);
+    open(el, node) {
+        this._save(this.markdownService.currentFile.value);
+        this.markdownService.reinitialization(node.content);
+        this.markdownService.currentFile.next(node);
+    }
+    /**
+     * @param {?} treeNode
+     * @return {?}
+     */
+    expanded(treeNode) {
+        /** @type {?} */
+        const data = (/** @type {?} */ (treeNode.data.data));
+        data.isExpanded = treeNode.isExpanded;
+        this.indexedDB.getObjectStore('markdown_article', 'readwrite')
+            .update(data)
+            .subscribe((/**
+         * @param {?} value
+         * @return {?}
+         */
+        value => console.log(value)));
+    }
+    /**
+     * @private
+     * @param {?} data
+     * @return {?}
+     */
+    _save(data) {
+        ((/** @type {?} */ (data))).content = this.markdownService.originMd.value;
+        this.indexedDB
+            .getObjectStore('markdown_article', 'readwrite')
+            .update(data)
+            .subscribe((/**
+         * @return {?}
+         */
+        () => {
+            this.refreshArticles();
+            console.log('save success');
+        }));
     }
     /**
      * @private
      * @return {?}
      */
     refreshArticles() {
-        this.indexedDB.getObjectStore('markdown_article', 'readwrite')
-            .getAll()
-            .subscribe((/**
-         * @param {?} value
+        return new Promise((/**
+         * @param {?} resolve
+         * @param {?} reject
          * @return {?}
          */
-        value => {
-            this.articles = value.data;
+        (resolve, reject) => {
+            this.indexedDB.getObjectStore('markdown_article', 'readwrite')
+                .getAll()
+                .subscribe((/**
+             * @param {?} value
+             * @return {?}
+             */
+            value => {
+                if (value.type === IndexedDBEventType.COMPLETE) {
+                    console.log(value);
+                    this.fileTree = new Tree(value.data);
+                    resolve(value);
+                }
+            }), (/**
+             * @param {?} error
+             * @return {?}
+             */
+            error => reject(error)));
         }));
     }
 }
 FileBrowserComponent.decorators = [
     { type: Component, args: [{
                 selector: 'nb-file-browser',
-                template: "<div class=\"file-browser\">\r\n  <header class=\"fb-header\"\r\n  >\r\n    <button class=\"fb-button fb-button_hover\"\r\n            (click)=\"createFile()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        note_add\r\n      </i>\r\n    </button>\r\n    <!--\u521B\u5EFA\u6587\u4EF6\u5939\u6682\u65F6\u4E0D\u53EF\u7528-->\r\n    <!--(click)=\"createFolder()\"-->\r\n    <button class=\"fb-button fb-button_disable\"\r\n            style=\"opacity: 0.5;\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        create_new_folder\r\n      </i>\r\n    </button>\r\n    <button class=\"fb-button fb-button_hover\"\r\n            (click)=\"delete()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        delete\r\n      </i>\r\n    </button>\r\n    <button class=\"fb-button fb-button_hover\"\r\n            (click)=\"rename()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        edit\r\n      </i>\r\n    </button>\r\n    <button class=\"fb-button fb-button_hover fb-button_close\"\r\n            (click)=\"close()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        close\r\n      </i>\r\n    </button>\r\n  </header>\r\n  <aside class=\"fb-list\"\r\n  >\r\n    <ul class=\"fb-ul\"\r\n        #fileList\r\n    >\r\n      <li class=\"fb-li fb-li_hover\" *ngFor=\"let article of articles\"\r\n          (click)=\"select($any($event.currentTarget), article)\"\r\n          (dblclick)=\"open($any($event.currentTarget), article)\"\r\n      >\r\n        <i class=\"material-icons md-18 md-dark\">\r\n          insert_drive_file\r\n        </i>\r\n        <span>\r\n          {{ article.title }}\r\n        </span>\r\n      </li>\r\n    </ul>\r\n  </aside>\r\n</div>\r\n",
-                styles: [".file-browser{display:flex;flex-direction:column;height:100%;background-color:#d3d3d3}.file-browser .fb-button{cursor:pointer;padding:1px 2px;margin:0;border:0;outline:0;height:100%;background-color:transparent}.file-browser .fb-button_hover:hover{background-color:rgba(0,0,0,.1)}.file-browser .fb-button_disable{cursor:default;opacity:.5}.file-browser .fb-button_close{float:right}.file-browser .fb-header{flex:0 0 30px;background-color:rgba(0,0,0,.1)}.file-browser .fb-list{flex:1 1 auto}.file-browser .fb-ul{list-style:none;margin:0;padding:2px}.file-browser .fb-li{display:flex;box-sizing:border-box;font-size:14px;width:190px;padding:2px;margin:3px;background-color:rgba(0,0,0,.05);border-radius:2px}.file-browser .fb-li_hover:hover{background-color:rgba(0,0,0,.1)}.file-browser .fb-li span{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.file-browser .fb-li_selected,.file-browser .fb-li_selected:hover{background-color:rgba(0,0,0,.2)}.file-browser .fb-li_create{background-color:#fff}.file-browser .fb-li_create-input{box-sizing:padding-box;width:163px;padding:0 0 0 5px;outline:0;border:none}"]
+                template: "<div class=\"file-browser\">\r\n  <header class=\"fb-header\"\r\n  >\r\n    <button class=\"fb-button fb-button_hover\"\r\n            (click)=\"createFile()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        note_add\r\n      </i>\r\n    </button>\r\n    <!--\u521B\u5EFA\u6587\u4EF6\u5939\u6682\u65F6\u4E0D\u53EF\u7528-->\r\n    <!--(click)=\"createFolder()\"-->\r\n    <button class=\"fb-button fb-button_hover\"\r\n            (click)=\"createFolder()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        create_new_folder\r\n      </i>\r\n    </button>\r\n    <button class=\"fb-button fb-button_hover\"\r\n            (click)=\"delete()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        delete\r\n      </i>\r\n    </button>\r\n    <button class=\"fb-button fb-button_hover\"\r\n            (click)=\"rename()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        edit\r\n      </i>\r\n    </button>\r\n    <button class=\"fb-button fb-button_hover fb-button_close\"\r\n            (click)=\"close()\"\r\n    >\r\n      <i class=\"material-icons md-dark\">\r\n        close\r\n      </i>\r\n    </button>\r\n  </header>\r\n  <aside class=\"fb-list\"\r\n  >\r\n    <nb-tree [dataSource]=\"fileTree\"\r\n    >\r\n      <nb-tree-node *nbTreeNodeDef=\"let data = data\" [isExpanded]=\"data.isExpanded\">\r\n        <li *ngIf=\"data.type === 'folder'\"\r\n            class=\"fb-li_hover\"\r\n            (click)=\"select($any($event.currentTarget), data)\"\r\n            nbTreeNodeToggle\r\n            (callbackFn)=\"expanded($event)\"\r\n        >\r\n          <i class=\"material-icons md-18 md-dark\">\r\n            subdirectory_arrow_right\r\n          </i>\r\n          <span>{{ data.name }}</span>\r\n        </li>\r\n        <li *ngIf=\"data.type === 'article'\"\r\n            class=\"fb-li_hover\"\r\n            (click)=\"select($any($event.currentTarget), data)\"\r\n            (dblclick)=\"open($any($event.currentTarget), data)\"\r\n        >\r\n          <i class=\"material-icons md-18 md-dark\">\r\n            insert_drive_file\r\n          </i>\r\n          <span>{{ data.title }}</span>\r\n        </li>\r\n        <ul>\r\n          <ng-container nbTreeNodeOutlet></ng-container>\r\n        </ul>\r\n      </nb-tree-node>\r\n    </nb-tree>\r\n  </aside>\r\n</div>\r\n",
+                encapsulation: ViewEncapsulation.None,
+                styles: [".file-browser{display:flex;flex-direction:column;height:100%;background-color:#d3d3d3}.file-browser .fb-button{cursor:pointer;padding:1px 2px;margin:0;border:0;outline:0;height:100%;background-color:transparent}.file-browser .fb-button_hover:hover{background-color:rgba(0,0,0,.1)}.file-browser .fb-button_disable{cursor:default;opacity:.5}.file-browser .fb-button_close{float:right}.file-browser .fb-header{flex:0 0 30px;background-color:rgba(0,0,0,.1)}.file-browser .fb-list{flex:1 1 auto;width:200px;overflow:auto}.file-browser .fb-list ul{list-style:none;margin:0 0 0 5px;padding-left:2px}.file-browser .fb-list li{display:flex;box-sizing:border-box;font-size:12px;padding:2px;margin:3px}.file-browser .fb-li_hover:hover{background-color:rgba(0,0,0,.1)}.file-browser .fb-list li span{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.file-browser .fb-li_selected,.file-browser .fb-li_selected:hover{background-color:rgba(0,0,0,.2)}.file-browser .fb-li_create{background-color:#fff;width:170px}.file-browser .fb-li_create-input{box-sizing:padding-box;width:100%;padding:0 0 0 5px;outline:0;border:none}"]
             }] }
 ];
 /** @nocollapse */
@@ -2073,16 +2241,17 @@ FileBrowserComponent.ctorParameters = () => [
     { type: Ngr2MarkdownService },
     { type: Renderer2 }
 ];
-FileBrowserComponent.propDecorators = {
-    fileList: [{ type: ViewChild, args: ['fileList', { read: ElementRef },] }]
-};
 class Article {
     /**
+     * @param {?=} parentId
+     * @param {?=} type
      * @param {?=} author
      * @param {?=} title
      * @param {?=} content
      */
-    constructor(author = Article.AUTHOR, title = Article.TITLE, content = Article.CONTENT) {
+    constructor(parentId = -1, type = 'article', author = Article.AUTHOR, title = Article.TITLE, content = Article.CONTENT) {
+        this.parentId = parentId;
+        this.type = type;
         this.author = author;
         this.title = title;
         this.content = content;
@@ -2093,6 +2262,21 @@ class Article {
 Article.AUTHOR = 'Author';
 Article.TITLE = 'Default Title';
 Article.CONTENT = '# Default Title';
+class Folder {
+    /**
+     * @param {?=} parentId
+     * @param {?=} type
+     * @param {?=} name
+     * @param {?=} isExpanded
+     */
+    constructor(parentId = -1, type = 'folder', name = Folder.NAME, isExpanded = true) {
+        this.parentId = parentId;
+        this.type = type;
+        this.name = name;
+        this.isExpanded = isExpanded;
+    }
+}
+Folder.NAME = 'folderName';
 
 /**
  * @fileoverview added by tsickle
@@ -2117,15 +2301,20 @@ class StatusBarComponent {
         allinfo => {
             this.mdInfo = allinfo.Markdown;
             this.htmlInfo = allinfo.HTML;
-            console.log(allinfo);
         }));
+        this.markdownService.currentFile
+            .subscribe((/**
+         * @param {?} info
+         * @return {?}
+         */
+        info => this.fileInfo = info));
     }
 }
 StatusBarComponent.decorators = [
     { type: Component, args: [{
                 selector: 'nb-status-bar',
-                template: "<footer class=\"status-bar\"\r\n>\r\n  <div class=\"status-bar_panel status-bar_panel-left\"\r\n  >\r\n    <span class=\"status-bar_panel-name\">Markdown</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ mdInfo.bytes }}</span>bytes</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ mdInfo.words }}</span>words</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ mdInfo.lines }}</span>lines</span>\r\n  </div>\r\n  <div class=\"status-bar_panel status-bar_panel-right\"\r\n  >\r\n    <span class=\"status-bar_panel-name\">HTML</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ htmlInfo.characters }}</span>characters</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ htmlInfo.words }}</span>words</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ htmlInfo.paragraphs }}</span>paragraphs</span>\r\n  </div>\r\n</footer>\r\n",
-                styles: [".status-bar{display:flex;justify-content:space-between;font-size:10px;background-color:#007acc;color:#fff;height:100%}.status-bar_panel{line-height:20px}.status-bar_panel-value{font-weight:700;margin-left:5px;margin-right:2px}.status-bar_panel-left{margin-left:210px}.status-bar_panel-right{margin-right:210px}"]
+                template: "<footer class=\"status-bar\"\r\n>\r\n  <div class=\"status-bar_panel sb-file_browser\"\r\n  >\r\n    <span class=\"status-bar_panel-name\">File</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ fileInfo && fileInfo.title }}</span></span>\r\n  </div>\r\n\r\n  <div class=\"status-bar_panel sb-edit_box\"\r\n  >\r\n    <span class=\"status-bar_panel-name\">Markdown</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ mdInfo.bytes }}</span>bytes</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ mdInfo.words }}</span>words</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ mdInfo.lines }}</span>lines</span>\r\n  </div>\r\n\r\n  <div class=\"status-bar_panel sb-control_bar\">\r\n  </div>\r\n\r\n  <div class=\"status-bar_panel sb-preview_box\"\r\n  >\r\n    <span class=\"status-bar_panel-name\">HTML</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ htmlInfo.characters }}</span>characters</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ htmlInfo.words }}</span>words</span>\r\n    <span><span class=\"status-bar_panel-value\">{{ htmlInfo.paragraphs }}</span>paragraphs</span>\r\n  </div>\r\n\r\n  <div class=\"status-bar_panel sb-menu\">\r\n  </div>\r\n</footer>\r\n",
+                styles: [".status-bar{display:flex;font-size:10px;background-color:#007acc;color:#fff;height:100%}.status-bar_panel{line-height:20px}.sb-file_browser{flex:0 0 200px}.sb-edit_box{flex:1 1 auto}.sb-control_bar{flex:0 0 10px}.sb-preview_box{flex:1 1 auto}.sb-menu{flex:0 0 280px}.status-bar_panel-value{font-weight:700;margin-left:5px;margin-right:2px}"]
             }] }
 ];
 /** @nocollapse */
@@ -2148,7 +2337,7 @@ class ControlBarComponent {
 ControlBarComponent.decorators = [
     { type: Component, args: [{
                 selector: 'nb-control-bar',
-                template: "control bar\r\n",
+                template: "",
                 styles: [""]
             }] }
 ];
@@ -2160,22 +2349,121 @@ ControlBarComponent.ctorParameters = () => [];
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
 class MenuComponent {
-    constructor() { }
+    /**
+     * @param {?} markdownService
+     */
+    constructor(markdownService) {
+        this.markdownService = markdownService;
+    }
     /**
      * @return {?}
      */
     ngOnInit() {
+        this.fileOperator = new FileOperatorImpl();
+    }
+    /**
+     * @return {?}
+     */
+    downloadMarkdown() {
+        /** @type {?} */
+        const unsubscribe = this.markdownService.observeMarkdown()
+            .subscribe((/**
+         * @param {?} value
+         * @return {?}
+         */
+        value => {
+            console.log(value);
+            /** @type {?} */
+            const file = new Blob([value.Markdown.text], { type: 'text/plain' });
+            /** @type {?} */
+            const dataUrl = this.fileOperator.toDataURLSync(file);
+            /** @type {?} */
+            const anchor = (/** @type {?} */ (document.createElement('A')));
+            anchor.download = 'Markdown.md';
+            anchor.href = dataUrl;
+            anchor.click();
+        }));
+        unsubscribe.unsubscribe();
+    }
+    /**
+     * @return {?}
+     */
+    downloadHTML() {
+        /** @type {?} */
+        const unsubscribe = this.markdownService.observeMarkdown()
+            .subscribe((/**
+         * @param {?} value
+         * @return {?}
+         */
+        value => {
+            /** @type {?} */
+            const htmlWindow = window.open('', '');
+            document.head.querySelectorAll('meta, style').forEach((/**
+             * @param {?} el
+             * @return {?}
+             */
+            el => {
+                htmlWindow.document.head.innerHTML += el.outerHTML;
+            }));
+            htmlWindow.document.body.innerHTML = `<article class="markdown-body" style="font-size: 14px;height: auto;overflow: visible;">`
+                + value.HTML.text
+                + `</article>`;
+            /** @type {?} */
+            const html = htmlWindow.document.documentElement.innerHTML;
+            htmlWindow.close();
+            /** @type {?} */
+            const file = new Blob([html], { type: 'text/html' });
+            /** @type {?} */
+            const dataUrl = this.fileOperator.toDataURLSync(file);
+            /** @type {?} */
+            const anchor = (/** @type {?} */ (document.createElement('A')));
+            anchor.download = 'HTML.html';
+            anchor.href = dataUrl;
+            anchor.click();
+        }));
+        unsubscribe.unsubscribe();
+    }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    downloadPDF() {
+        /** @type {?} */
+        const unsubscribe = this.markdownService.observeMarkdown()
+            .subscribe((/**
+         * @param {?} value
+         * @return {?}
+         */
+        value => {
+            /** @type {?} */
+            const htmlWindow = window.open('', '');
+            document.head.querySelectorAll('meta, style').forEach((/**
+             * @param {?} el
+             * @return {?}
+             */
+            el => {
+                htmlWindow.document.head.innerHTML += el.outerHTML;
+            }));
+            htmlWindow.document.body.innerHTML = `<article class="markdown-body" style="font-size: 14px;height: auto;overflow: visible;">`
+                + value.HTML.text
+                + `</article>`;
+            htmlWindow.print();
+            htmlWindow.close();
+        }));
+        unsubscribe.unsubscribe();
     }
 }
 MenuComponent.decorators = [
     { type: Component, args: [{
                 selector: 'nb-menu',
-                template: "menu\r\n",
-                styles: [""]
+                template: "<div class=\"menu\">\r\n  <header class=\"mu-header\">\r\n    <span class=\"mu-title\">MENU</span>\r\n  </header>\r\n  <aside class=\"mu-list\">\r\n    <ul>\r\n      <li class=\"mu-li_hover\"\r\n          (click)=\"downloadMarkdown()\"\r\n      >\r\n        <i class=\"material-icons md-18 md-dark\">\r\n          cloud_download\r\n        </i>\r\n        <div class=\"mu-item\">\r\n          <span class=\"mu-item-title\">Download Markdown</span>\r\n          <span class=\"mu-item-description\">Download Markdown</span>\r\n        </div>\r\n      </li>\r\n      <li class=\"mu-li_hover\"\r\n          (click)=\"downloadHTML()\"\r\n      >\r\n        <i class=\"material-icons md-18 md-dark\">\r\n          cloud_download\r\n        </i>\r\n        <div class=\"mu-item\">\r\n          <span class=\"mu-item-title\">Download HTML</span>\r\n          <span class=\"mu-item-description\">Download HTML</span>\r\n        </div>\r\n      </li>\r\n      <li class=\"mu-li_hover\"\r\n          (click)=\"downloadPDF()\"\r\n      >\r\n        <i class=\"material-icons md-18 md-dark\">\r\n          cloud_download\r\n        </i>\r\n        <div class=\"mu-item\">\r\n          <span class=\"mu-item-title\">Download PDF (Disable)</span>\r\n          <span class=\"mu-item-description\">Download PDF</span>\r\n        </div>\r\n      </li>\r\n    </ul>\r\n  </aside>\r\n</div>\r\n",
+                styles: [".menu{display:flex;flex-direction:column;height:100%;background-color:#d3d3d3}.mu-header{flex:0 0 30px;background-color:rgba(0,0,0,.1)}.menu .mu-title{line-height:30px;margin:0 5px}.mu-list{flex:1 1 auto;width:280px;overflow:auto}.mu-list ul{list-style:none;margin:0 0 0 5px;padding-left:2px}.mu-list li{display:flex;align-items:center;box-sizing:border-box;font-size:12px;padding:10px;margin:3px}.mu-li_hover:hover{background-color:rgba(0,0,0,.1)}.mu-item{display:flex;flex-direction:column;margin-left:10px}.mu-item-title{font-size:16px}.mu-item-description{font-size:12px;color:gray}"]
             }] }
 ];
 /** @nocollapse */
-MenuComponent.ctorParameters = () => [];
+MenuComponent.ctorParameters = () => [
+    { type: Ngr2MarkdownService }
+];
 
 /**
  * @fileoverview added by tsickle
@@ -2819,6 +3107,329 @@ DragAndDropDirective.ctorParameters = () => [
  * @fileoverview added by tsickle
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
+class TreeNodeOutletDirective {
+    /**
+     * @param {?} viewContainer
+     */
+    constructor(viewContainer) {
+        this.viewContainer = viewContainer;
+    }
+}
+TreeNodeOutletDirective.decorators = [
+    { type: Directive, args: [{
+                selector: '[nbTreeNodeOutlet]'
+            },] }
+];
+/** @nocollapse */
+TreeNodeOutletDirective.ctorParameters = () => [
+    { type: ViewContainerRef }
+];
+class TreeNodeDefDirective {
+    /**
+     * @param {?} templateRef
+     */
+    constructor(templateRef) {
+        this.templateRef = templateRef;
+        // view.createEmbeddedView(template);
+    }
+}
+TreeNodeDefDirective.decorators = [
+    { type: Directive, args: [{
+                selector: '[nbTreeNodeDef]'
+            },] }
+];
+/** @nocollapse */
+TreeNodeDefDirective.ctorParameters = () => [
+    { type: TemplateRef }
+];
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+class TreeComponent {
+    /**
+     * @param {?} differs
+     */
+    constructor(differs) {
+        this.differs = differs;
+        this._dataDiffer = differs.find([])
+            .create((/**
+         * @param {?} index
+         * @param {?} item
+         * @return {?}
+         */
+        (index, item) => item));
+    }
+    /**
+     * @param {?} ds
+     * @return {?}
+     */
+    set dataSource(ds) {
+        if (!ds) {
+            return;
+        }
+        this._ds = ds;
+        this.renderNodeChanges(this._ds.rootNode.children, this._dataDiffer, this.outlet.viewContainer);
+    }
+    /**
+     * @return {?}
+     */
+    get dataSource() {
+        return this._ds;
+    }
+    /**
+     * @return {?}
+     */
+    ngOnInit() {
+    }
+    /**
+     * @param {?} data
+     * @param {?=} dataDiffer
+     * @param {?=} viewContainer
+     * @return {?}
+     */
+    renderNodeChanges(data, dataDiffer = this._dataDiffer, viewContainer = this.outlet.viewContainer) {
+        /** @type {?} */
+        const changes = dataDiffer.diff(data);
+        if (!changes) {
+            return;
+        }
+        changes.forEachOperation((/**
+         * @param {?} record
+         * @param {?} previousIndex
+         * @param {?} currentIndex
+         * @return {?}
+         */
+        (record, previousIndex, currentIndex) => {
+            // console.log(record.previousIndex, previousIndex, record.currentIndex, currentIndex);
+            if (record.previousIndex === null) {
+                viewContainer.createEmbeddedView(this.def.first.templateRef, record.item, currentIndex);
+                TreeControl.mostRecentTreeNode.data = record.item;
+            }
+            else if (currentIndex === null) {
+                viewContainer.remove(previousIndex);
+            }
+            else {
+                /** @type {?} */
+                const view = viewContainer.get(previousIndex);
+                viewContainer.move(view, currentIndex);
+            }
+        }));
+    }
+}
+TreeComponent.decorators = [
+    { type: Component, args: [{
+                selector: 'nb-tree',
+                template: "<ul>\n  <ng-container nbTreeNodeOutlet></ng-container>\n</ul>\n",
+                styles: [""]
+            }] }
+];
+/** @nocollapse */
+TreeComponent.ctorParameters = () => [
+    { type: IterableDiffers }
+];
+TreeComponent.propDecorators = {
+    outlet: [{ type: ViewChild, args: [TreeNodeOutletDirective,] }],
+    def: [{ type: ContentChildren, args: [TreeNodeDefDirective,] }],
+    dataSource: [{ type: Input }]
+};
+class TreeControl {
+}
+TreeControl.mostRecentTreeNode = null;
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+class TreeNodeComponent {
+    /**
+     * @param {?} _tree
+     * @param {?} _differs
+     */
+    constructor(_tree, _differs) {
+        this._tree = _tree;
+        this._differs = _differs;
+        TreeControl.mostRecentTreeNode = this;
+        this._dataDiffer = this._differs.find([]).create();
+    }
+    /**
+     * @return {?}
+     */
+    get isExpanded() { return this._isExpanded; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set isExpanded(value) {
+        console.log('isExpanded');
+        this._isExpanded = value;
+        if (this.isExpanded) {
+            this.updateChildrenNodes();
+        }
+        else {
+            this.outlet.viewContainer.clear();
+            this._dataDiffer.diff([]);
+        }
+    }
+    /**
+     * 树节点的数据
+     * @return {?}
+     */
+    get data() { return this._data; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set data(value) {
+        this._data = value;
+    }
+    /**
+     * @return {?}
+     */
+    ngOnInit() {
+        // this._tree.renderNodeChanges(this.data.children, this._dataDiffer, this.outlet.viewContainer);
+    }
+    /**
+     * @return {?}
+     */
+    ngAfterContentInit() {
+    }
+    /**
+     * @return {?}
+     */
+    updateChildrenNodes() {
+        this._tree.renderNodeChanges(this.data.children, this._dataDiffer, this.outlet.viewContainer);
+    }
+}
+TreeNodeComponent.decorators = [
+    { type: Component, args: [{
+                selector: 'nb-tree-node',
+                template: "<ng-content></ng-content>\n",
+                styles: [""]
+            }] }
+];
+/** @nocollapse */
+TreeNodeComponent.ctorParameters = () => [
+    { type: TreeComponent },
+    { type: IterableDiffers }
+];
+TreeNodeComponent.propDecorators = {
+    isExpanded: [{ type: Input }],
+    outlet: [{ type: ContentChild, args: [TreeNodeOutletDirective,] }]
+};
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+class TreeNodeToggleDirective {
+    /**
+     * @param {?} treeNode
+     */
+    constructor(treeNode) {
+        this.treeNode = treeNode;
+        this.callbackFn = new EventEmitter();
+        console.log(treeNode);
+    }
+    /**
+     * @param {?} event
+     * @return {?}
+     */
+    toggle(event) {
+        this.treeNode.isExpanded = !this.treeNode.isExpanded;
+        event.preventDefault();
+        this.callbackFn.emit(this.treeNode);
+    }
+}
+TreeNodeToggleDirective.decorators = [
+    { type: Directive, args: [{
+                selector: '[nbTreeNodeToggle]'
+            },] }
+];
+/** @nocollapse */
+TreeNodeToggleDirective.ctorParameters = () => [
+    { type: TreeNodeComponent }
+];
+TreeNodeToggleDirective.propDecorators = {
+    toggle: [{ type: HostListener, args: ['dblclick', ['$event'],] }],
+    callbackFn: [{ type: Output }]
+};
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+class SyncScrollDirective {
+    /**
+     * @param {?} markdownService
+     * @param {?} el
+     */
+    constructor(markdownService, el) {
+        this.markdownService = markdownService;
+        this.scroll = this.onScroll;
+        this._el = el.nativeElement;
+    }
+    /**
+     * @return {?}
+     */
+    ngOnInit() {
+        this.subscription = this.markdownService.syncScroll
+            .subscribe((/**
+         * @param {?} value
+         * @return {?}
+         */
+        (value) => {
+            if (!value || value.headingInfo.el === this._el) {
+                return;
+            }
+            /** @type {?} */
+            const curHeading = this.syncScrollInfo.getPairHeading(value.headingInfo.pairId);
+            /** @type {?} */
+            const deltaHeight = value.scrollTop - value.headingInfo.offsetTop;
+            this._el.scrollTop = curHeading.headingInfo.offsetTop + (curHeading.headingInfo.height / value.headingInfo.height) * deltaHeight;
+        }));
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this.subscription.unsubscribe();
+    }
+    /**
+     * @param {?} event
+     * @return {?}
+     */
+    onScroll(event) {
+        if (SyncScrollDirective.mutexLock) {
+            SyncScrollDirective.mutexLock = false;
+        }
+        else {
+            this.markdownService.syncScroll.next(this.syncScrollInfo.currentHeading());
+            SyncScrollDirective.mutexLock = true;
+        }
+    }
+}
+SyncScrollDirective.mutexLock = false;
+SyncScrollDirective.decorators = [
+    { type: Directive, args: [{
+                selector: '[nbSyncScroll]'
+            },] }
+];
+/** @nocollapse */
+SyncScrollDirective.ctorParameters = () => [
+    { type: Ngr2MarkdownService },
+    { type: ElementRef }
+];
+SyncScrollDirective.propDecorators = {
+    scroll: [{ type: HostListener, args: ['scroll', ['$event'],] }],
+    syncScrollInfo: [{ type: Input }]
+};
+
+/**
+ * @fileoverview added by tsickle
+ * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
 class Ngr2MarkdownModule {
 }
 Ngr2MarkdownModule.decorators = [
@@ -2834,7 +3445,13 @@ Ngr2MarkdownModule.decorators = [
                     StatusBarComponent,
                     ControlBarComponent,
                     MenuComponent,
-                    DragAndDropDirective
+                    DragAndDropDirective,
+                    TreeComponent,
+                    TreeNodeComponent,
+                    TreeNodeDefDirective,
+                    TreeNodeOutletDirective,
+                    TreeNodeToggleDirective,
+                    SyncScrollDirective
                 ],
                 imports: [
                     BrowserModule
@@ -2857,6 +3474,6 @@ Ngr2MarkdownModule.decorators = [
  * @suppress {checkTypes,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
 
-export { Ngr2MarkdownService, EditorOption, TOCItem, Ngr2MarkdownComponent, Ngr2MarkdownModule, ControlBarComponent as ɵh, DragAndDropDirective as ɵj, EditBoxComponent as ɵe, FileBrowserComponent as ɵf, MenuComponent as ɵi, HTMLPipePipe as ɵb, MdPipe as ɵc, SideTocComponent as ɵa, StatusBarComponent as ɵg, ToolBarComponent as ɵd };
+export { Ngr2MarkdownService, EditorOption, TOCItem, Ngr2MarkdownComponent, Ngr2MarkdownModule, ControlBarComponent as ɵh, DragAndDropDirective as ɵj, EditBoxComponent as ɵe, FileBrowserComponent as ɵf, MenuComponent as ɵi, HTMLPipePipe as ɵb, MdPipe as ɵc, SideTocComponent as ɵa, StatusBarComponent as ɵg, SyncScrollDirective as ɵp, ToolBarComponent as ɵd, TreeNodeDefDirective as ɵm, TreeNodeOutletDirective as ɵl, TreeNodeToggleDirective as ɵo, TreeNodeComponent as ɵn, TreeComponent as ɵk };
 
 //# sourceMappingURL=ngr2-markdown.js.map

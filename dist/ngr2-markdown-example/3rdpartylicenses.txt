@@ -1,3 +1,5 @@
+ngr2-markdown
+
 highlight.js
 BSD-3-Clause
 Copyright (c) 2006, Ivan Sagalaev
@@ -319,8 +321,6 @@ Apache-2.0
 
 @angular/core
 MIT
-
-ngr2-markdown
 
 @angular/common
 MIT

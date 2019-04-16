@@ -4,6 +4,7 @@ export declare class StatusBarComponent implements OnInit {
     private markdownService;
     mdInfo: any;
     htmlInfo: any;
+    fileInfo: any;
     constructor(markdownService: Ngr2MarkdownService);
     ngOnInit(): void;
 }

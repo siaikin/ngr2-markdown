@@ -5,7 +5,7 @@ export declare class Ngr2MarkdownService {
     /**
      * 接收Markdown源文本
      */
-    private originMd;
+    originMd: BehaviorSubject<string>;
     private resetMd;
     /**
      * 观察`originMd`通过`render`方法渲染出的HTML
@@ -27,6 +27,8 @@ export declare class Ngr2MarkdownService {
      * 发送目录信息的Subject
      */
     TOCInfo: BehaviorSubject<TOCItem>;
+    syncScroll: BehaviorSubject<any>;
+    currentFile: BehaviorSubject<any>;
     constructor();
     /**
      * 重置markdown文本
