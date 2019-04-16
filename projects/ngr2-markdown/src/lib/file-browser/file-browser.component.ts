@@ -86,7 +86,20 @@ export class FileBrowserComponent implements OnInit {
             })
           )
           .subscribe(value => {
-            this.refreshArticles();
+            // 获取数据库中的所有文件
+            this.refreshArticles().then(() => {
+              // 找到最近修改的Article
+              const currentFile = this.fileTree.recursionChildNodes(-1)
+                .filter((file: TreeableNode) => file.type !== 'folder')
+                .reduce(
+                  (previousValue: Article, currentValue: Article) =>
+                    previousValue.lastModifiedTime > currentValue.lastModifiedTime ? previousValue : currentValue
+                );
+
+              // 发送当前的Article
+              this.markdownService.currentFile.next(currentFile);
+              this.markdownService.reinitialization((currentFile as Article).content);
+            });
           });
       });
   }
@@ -189,7 +202,7 @@ export class FileBrowserComponent implements OnInit {
   }
 
   select(el: HTMLElement, node: TreeableNode): void {
-    console.log('select');
+
     if (this.selectedNode) {
       if (this.selectedNode.el === el) {
         this.selectedNode.el.classList.remove('fb-li_selected');
@@ -203,31 +216,45 @@ export class FileBrowserComponent implements OnInit {
       el.classList.add('fb-li_selected');
       this.selectedNode = {el, data: node};
     }
+    console.log(this.selectedNode);
   }
 
   open(el: HTMLElement, node: TreeableNode): void {
-    console.log('open');
+    this._save(this.markdownService.currentFile.value);
     this.markdownService.reinitialization(node.content);
+    this.markdownService.currentFile.next(node);
   }
 
   expanded(treeNode: TreeNodeComponent) {
     const data = <Folder> treeNode.data.data;
     data.isExpanded = treeNode.isExpanded;
-    console.log(data);
     this.indexedDB.getObjectStore('markdown_article', 'readwrite')
       .update(data)
       .subscribe(value => console.log(value));
   }
 
-  private refreshArticles(): void {
-    this.indexedDB.getObjectStore('markdown_article', 'readwrite')
-      .getAll<any>()
-      .subscribe(value => {
-        if (value.type === IndexedDBEventType.COMPLETE) {
-          console.log(value);
-          this.fileTree = new Tree(value.data);
-        }
+  private _save(data: TreeableNode) {
+    (data as Article).content = this.markdownService.originMd.value;
+    this.indexedDB
+      .getObjectStore('markdown_article', 'readwrite')
+      .update(data)
+      .subscribe(() => {
+        this.refreshArticles();
+        console.log('save success');
       });
+  }
+  private refreshArticles(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.indexedDB.getObjectStore('markdown_article', 'readwrite')
+        .getAll<any>()
+        .subscribe(value => {
+          if (value.type === IndexedDBEventType.COMPLETE) {
+            console.log(value);
+            this.fileTree = new Tree(value.data);
+            resolve(value);
+          }
+        }, error => reject(error));
+    });
   }
 }
 

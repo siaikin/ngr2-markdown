@@ -1,50 +1,130 @@
-import {Component, ElementRef, OnInit} from '@angular/core';
+import {Component, ElementRef, OnInit, ViewChild, ViewEncapsulation} from '@angular/core';
 import {Observable, Subject} from 'rxjs';
 import {debounceTime, distinctUntilChanged} from 'rxjs/operators';
 import {Ngr2MarkdownService} from '../service/ngr2-markdown.service';
-import {ShortcutKey} from '../core/shortcutKey/shortcutKey';
+import {MarkdownMarker, MarkType} from '../core/markdown/markdownMarker';
+import {MarkdownRenderer} from '../core/markdown/markdwonRenderer';
+import {SyncScroll} from '../core/syncScroll';
 
 @Component({
   selector: 'nb-edit-box',
   templateUrl: './edit-box.component.html',
-  styleUrls: ['./edit-box.component.css']
+  styleUrls: ['./edit-box.component.css'],
+  encapsulation: ViewEncapsulation.None
 })
 export class EditBoxComponent implements OnInit {
 
-  private _el: HTMLElement;
+  @ViewChild('editArea', {read: ElementRef}) editAreaRef: ElementRef;
+  @ViewChild('editWindow', {read: ElementRef}) editWindowRef: ElementRef;
+
   private _editArea: HTMLElement;
-  private mdSubject: Subject<string> = new Subject<string>();
+  private _selection: Selection;
+  private contentChange: Subject<string> = new Subject<string>();
+  private marker: MarkdownMarker;
+  private renderer: MarkdownRenderer;
 
-  set text (value: string) {
-    this._editArea.innerText = value;
+  private get _range() { return this._selection.getRangeAt(0); }
+
+  syncScroll: SyncScroll;
+
+  set content(value: string) {
+    if (!value || value.length <= 0) {
+      this._editArea.innerHTML = '<div><br></div>';
+    } else {
+      this._editArea.innerText = value;
+    }
   }
-  get text (): string {
-    return this._editArea.innerText;
+  get content(): string {
+    console.log({
+      before: this._editArea.innerText,
+      after: this._editArea.innerText.replace(/\n\n/g, '\n')
+    });
+    return this._editArea.innerText.replace(/\n\n/g, '\n');
   }
 
-  constructor(private markdownService: Ngr2MarkdownService,
-              el: ElementRef
+  constructor(private markdownService: Ngr2MarkdownService
   ) {
-    this._el = el.nativeElement;
   }
 
   ngOnInit() {
-    this._editArea = this._el.querySelector('#editArea');
+    this._editArea  = this.editAreaRef.nativeElement;
     this._editArea.focus();
+    this._selection = document.getSelection();
 
-    const sk = new ShortcutKey(this._editArea);
+    this.syncScroll = new SyncScroll(
+      this.editWindowRef.nativeElement,
+      'edit',
+      (node, index) => index + '-' + ((node as HTMLElement).className.charCodeAt(1) - 48)
+    );
+    this.syncScroll.syncScrollByHeading('class');
+    // const sk = new ShortcutKey(this._editArea);
+
+    this.marker   = new MarkdownMarker();
+    this.renderer = new MarkdownRenderer();
 
     this.bindMdService();
     this.bindMutationObserver();
   }
 
+  keyUp(event: KeyboardEvent) {
+    const text = this._range.startContainer.textContent;
+    const type = this.marker.testMarks(text);
+
+    switch (type) {
+      case MarkType.HEADING:
+        this.renderer.renderRange(this._range, type, this.marker.parseHeading(text));
+        break;
+      default:
+        this.renderer.renderRange(this._range, type);
+        break;
+    }
+  }
+
+  paste(event: ClipboardEvent) {
+    const text = event.clipboardData.getData('text');
+    document.execCommand('insertText', false, text);
+    const children = this._editArea.children;
+    for (let i = 0; i < children.length; i++) {
+      const type = this.marker.testMarks(children[i].textContent);
+
+      switch (type) {
+        case MarkType.HEADING:
+          this.renderer.renderEl(children[i] as HTMLElement, type, this.marker.parseHeading(children[i].textContent));
+          break;
+        default:
+          this.renderer.renderEl(children[i] as HTMLElement, type);
+          break;
+      }
+    }
+    this.syncScroll.updateHeadingsInfo();
+    event.preventDefault();
+  }
   /**
    * 订阅MarkdownService的一些Subject/Observable
    */
   private bindMdService(): void {
+    // 订阅重置事件
     this.markdownService.observerResetMarkdown()
       .subscribe(md => {
-        this.text = md;
+        this._editArea.innerHTML = '<div><br></div>';
+        this._editArea.focus();
+
+        document.execCommand('insertText', false, md);
+        const children = this._editArea.children;
+        for (let i = 0; i < children.length; i++) {
+          const type = this.marker.testMarks(children[i].textContent);
+
+          switch (type) {
+            case MarkType.HEADING:
+              this.renderer.renderEl(children[i] as HTMLElement, type, this.marker.parseHeading(children[i].textContent));
+              break;
+            default:
+              this.renderer.renderEl(children[i] as HTMLElement, type);
+              break;
+          }
+        }
+        this.syncScroll.updateHeadingsInfo();
+        // this.content = md;
       });
 
     this.markdownService
@@ -57,9 +137,9 @@ export class EditBoxComponent implements OnInit {
    */
   private observeText(time?: number): Observable<string> {
     if (!time) {
-      return this.mdSubject.asObservable();
+      return this.contentChange.asObservable();
     }
-    return this.mdSubject
+    return this.contentChange
       .pipe(
         distinctUntilChanged(),
         debounceTime(time)
@@ -67,18 +147,19 @@ export class EditBoxComponent implements OnInit {
   }
 
   /**
-   * 绑定并开启MutationObserver, 触发时将markdown文本发送到`mdSubject`
+   * 绑定并开启MutationObserver, 触发时将markdown文本发送到`mdChange`
    */
   private bindMutationObserver() {
     const _observer = new MutationObserver((mutations: Array<MutationRecord>, observer: MutationObserver) => {
-      this.mdSubject.next(this.text);
+      this.syncScroll.updateHeadingsInfo();
+      this.contentChange.next(this.content);
     });
 
     _observer.observe(this._editArea, {
       subtree: true,
       childList: true,
       characterData: true,
-      characterDataOldValue: true
+      attributes: true
     });
   }
 }

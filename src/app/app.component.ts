@@ -9,6 +9,7 @@ import {Tree} from '../../projects/ngr2-markdown/src/lib/core/tree/tree';
 })
 export class AppComponent implements AfterViewInit, AfterViewChecked {
   title = 'ngr2-markdown-example';
+  /*tslint:disable*/
   exampleText1 = `## page类构造函数
 \`\`\`java
 public Page(int pageId, String pageTitle, String pageAuthor, String pageContent, Timestamp createTime, Timestamp lastModifiedTime) {
@@ -55,54 +56,18 @@ cause=org.hibernate.PropertyNotFoundException: no appropriate constructor in cla
 所以应该是hibernate在mysql的timestamp类型和java的Timestamp类型转换的问题.
 但是通过Criteria添加条件,是可以成功执行查询的,所以问题范围缩小到HQL语句的DTO查询对Timestamp类型的转换识别
 `;
-  exampleText2 = `## Controller层
-\`\`\`java
-/**
-     * 获取指定页面完整信息
-     * @author Ce
-     * @date 2018/4/25 17:02
-     * @param [pageId]
-     * @return com.alibaba.fastjson.JSONObject
-     */
-    public Page pageInfo (int pageId) {
-
-        Object[] params = new Object[1];
-        params[0] = pageId;
-        List list = queryRepository.executeQuery("select new Page(pageId, pageTitle, pageAuthor, pageContent, createTime, lastModifiedTime) from Page where pageId=?0", params);
-
-        if (list.size() > 1) {
-            try {
-                throw new Exception("pageId对应了多个page");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        return (Page) list.get(0);
-    }
-\`\`\``;
+  /*tslint:enable*/
   content = null;
 
   constructor(
     private markdownService: Ngr2MarkdownService
   ) {
-    markdownService.reinitialization(this.exampleText1);
+    // markdownService.reinitialization(this.exampleText1);
   }
 
   ngAfterViewInit(): void {
   }
 
   ngAfterViewChecked(): void {
-  }
-
-  changeContent() {
-    if (this.content === null || this.content === this.exampleText1) {
-      this.content = this.exampleText2;
-    } else {
-      this.content = this.exampleText1;
-    }
-  }
-
-  changeContentToNull() {
-    this.content = null;
   }
 }

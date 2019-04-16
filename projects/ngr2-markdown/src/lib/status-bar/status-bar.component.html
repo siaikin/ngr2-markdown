@@ -1,17 +1,30 @@
 <footer class="status-bar"
 >
-  <div class="status-bar_panel status-bar_panel-left"
+  <div class="status-bar_panel sb-file_browser"
+  >
+    <span class="status-bar_panel-name">File</span>
+    <span><span class="status-bar_panel-value">{{ fileInfo && fileInfo.title }}</span></span>
+  </div>
+
+  <div class="status-bar_panel sb-edit_box"
   >
     <span class="status-bar_panel-name">Markdown</span>
     <span><span class="status-bar_panel-value">{{ mdInfo.bytes }}</span>bytes</span>
     <span><span class="status-bar_panel-value">{{ mdInfo.words }}</span>words</span>
     <span><span class="status-bar_panel-value">{{ mdInfo.lines }}</span>lines</span>
   </div>
-  <div class="status-bar_panel status-bar_panel-right"
+
+  <div class="status-bar_panel sb-control_bar">
+  </div>
+
+  <div class="status-bar_panel sb-preview_box"
   >
     <span class="status-bar_panel-name">HTML</span>
     <span><span class="status-bar_panel-value">{{ htmlInfo.characters }}</span>characters</span>
     <span><span class="status-bar_panel-value">{{ htmlInfo.words }}</span>words</span>
     <span><span class="status-bar_panel-value">{{ htmlInfo.paragraphs }}</span>paragraphs</span>
+  </div>
+
+  <div class="status-bar_panel sb-menu">
   </div>
 </footer>

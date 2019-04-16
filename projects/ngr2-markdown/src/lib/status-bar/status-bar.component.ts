@@ -11,6 +11,7 @@ export class StatusBarComponent implements OnInit {
 
   mdInfo;
   htmlInfo;
+  fileInfo;
 
   constructor(private markdownService: Ngr2MarkdownService
   ) {
@@ -22,6 +23,9 @@ export class StatusBarComponent implements OnInit {
         this.mdInfo   = allinfo.Markdown;
         this.htmlInfo = allinfo.HTML;
       });
+
+    this.markdownService.currentFile
+      .subscribe(info => this.fileInfo = info);
   }
 
 }

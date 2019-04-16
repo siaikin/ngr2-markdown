@@ -14,7 +14,7 @@ export class Ngr2MarkdownService {
   /**
    * 接收Markdown源文本
    */
-  private originMd: BehaviorSubject<string> = new BehaviorSubject<string>('');
+  originMd: BehaviorSubject<string> = new BehaviorSubject<string>('');
   private resetMd: BehaviorSubject<string> = new BehaviorSubject<string>('');
   /**
    * 观察`originMd`通过`render`方法渲染出的HTML
@@ -33,7 +33,8 @@ export class Ngr2MarkdownService {
    * 发送目录信息的Subject
    */
   TOCInfo: BehaviorSubject<TOCItem> = new BehaviorSubject<TOCItem>(null);
-  syncScroll: BehaviorSubject<HTMLElement> = new BehaviorSubject<HTMLElement>(null);
+  syncScroll: BehaviorSubject<any> = new BehaviorSubject<any>(null);
+  currentFile: BehaviorSubject<any> = new BehaviorSubject<any>(null);
 
   constructor() {
     this._md = new MarkdownImpl();
@@ -164,9 +165,10 @@ export class Ngr2MarkdownService {
   private anchor(md: MarkdownIt, observer: Observer<Array<any>>) {
     md.core.ruler.push('anchor', (state => {
       const infoList: Array<any> = [];
-      state.tokens.map((token, index, array) => {
+      let index = 0;
+      state.tokens.forEach((token) => {
         if (token.type === 'heading_open') {
-          token.attrJoin('id', array[index + 1].content);
+          token.attrJoin('id', index++ + '-' + token.markup.length);
           infoList.push({
             content: token.attrGet('id'),
             indentLevel: token.markup.length

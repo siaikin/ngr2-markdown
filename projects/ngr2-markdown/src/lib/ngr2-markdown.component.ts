@@ -1,26 +1,12 @@
-/*
-* 流程图
-* change `markdown` --> render `markdown` --> change `_html'
-*                                       --> change `headingInfo`
-*                                       --> init `headingElementRef`, `headingElementMarginTop`
-*                                       --> view changed `ngAfterViewChecked()` --> change `headingElementRef`
-*                                                        --> change `headingElementMarginTop`
-*                                                        --> wait view scroll --> `markdownScroll()`
-*                                                                             --> `markdownService.setCurrentBrowseHeading`
-* */
-
 import {
-  Component, DoCheck,
-  ElementRef,
-  Input, OnChanges,
-  OnInit, SimpleChanges,
-  ViewChild,
+  Component, ElementRef,
+  Input, OnInit, ViewChild,
   ViewEncapsulation
 } from '@angular/core';
 import {EditorOption, Ngr2MarkdownService} from './service/ngr2-markdown.service';
 import {fromEvent} from 'rxjs';
 import {distinctUntilChanged, filter, map} from 'rxjs/operators';
-import {ParseUnit} from './utils/parseUnit';
+import {SyncScroll} from './core/syncScroll';
 
 @Component({
   selector: 'nb-ngr2-markdown',
@@ -30,7 +16,7 @@ import {ParseUnit} from './utils/parseUnit';
   ],
   encapsulation: ViewEncapsulation.None
 })
-export class Ngr2MarkdownComponent implements OnInit, OnChanges, DoCheck {
+export class Ngr2MarkdownComponent implements OnInit {
   @ViewChild('markdownBody', {
     read: ElementRef
   }) markdownBody: ElementRef;
@@ -42,17 +28,9 @@ export class Ngr2MarkdownComponent implements OnInit, OnChanges, DoCheck {
    * 配置参数
    */
   _options: EditorOption;
-  /**
-   * 标题标签引用的数组
-   */
-  headingElementRef: Array<HTMLElement>;
-  /**
-   * 标题标签margin-top属性的键值对
-   * key: id, value: margin-top的px值
-   */
-  headingElementMarginTop: {
-    [key: string]: number
-  };
+
+  syncScroll: SyncScroll;
+
   @Input()
   set markdown(value: string) {
     this.markdownService.updateMarkdown(value);
@@ -66,117 +44,33 @@ export class Ngr2MarkdownComponent implements OnInit, OnChanges, DoCheck {
   ) {
   }
 
-  ngOnChanges(changes: SimpleChanges): void {
-  }
-
-  ngDoCheck(): void {
-  }
-
   ngOnInit() {
+    this.syncScroll = new SyncScroll(
+      this.markdownBody.nativeElement,
+      'pre',
+      (node, index) => index + '-' + ((node as HTMLElement).tagName.charCodeAt(1) - 48)
+    );
+    this.syncScroll.syncScrollByHeading();
+
     this.markdownService.observeMarkdown()
       .subscribe(value => {
         // 更新innerHTML
         this._html = value.html;
+        // this.updateHeadingsInfo();
         // 重新初始化一些需要视图渲染结束才能获取的对象的值
         // this.reinitialization();
-        // setTimeout(() => {
-        //   this.updateHeadingInfo();
-        // });
+        setTimeout(() => {
+          this.syncScroll.updateHeadingsInfo();
+        });
       });
 
     fromEvent(this.markdownBody.nativeElement, 'scroll')
       .pipe(
-        filter(() => this.headingElementRef && this.headingElementRef.length > 0),
-        map(() => this.markdownScroll()),
+        filter(() => this.syncScroll.headingsInfo && this.syncScroll.headingsInfo.length > 0),
+        map(() => this.syncScroll.currentHeading()),
         distinctUntilChanged()
       )
-      .subscribe(this.markdownService.currentHeading);
-
-    // this.bindMutationObserver();
-  }
-
-  reinitialization() {
-    this.headingElementMarginTop = {};
-    // 初始化标题元素的数组
-    this.headingElementRef = [];
-    // 页面滚动到顶部
-    this.markdownBody.nativeElement.scrollTop = 0;
-    // 重置当前标题
-    this.markdownService.setCurrentHeading(null);
-  }
-
-  /**
-   * @description <b>元素的位置用
-   * [getBoundingClientRect()]{@link https://developer.mozilla.org/zh-CN/docs/Web/API/Element/getBoundingClientRect}获取,
-   * 这个方法得到的矩形不会包括元素的外边距(margin)</b>
-   * 如果想要在检测时包括外边距, 需要先获取到外边距
-   * markdown内容滚动时触发
-   * 基于父元素的顶部位置, 判断当前浏览的标题内容
-   * 选出标题元素(h1 ~ h6)的顶部在父元素(class=markdown)顶部之上或相等的元素, 作为当前浏览的标题
-   */
-  markdownScroll(): string {
-    // 父元素顶部的坐标
-    const baseOffsetTop = (<HTMLElement> this.markdownBody.nativeElement).getBoundingClientRect().top;
-    let preRect: ClientRect;
-    let curRect: ClientRect;
-    let preMarginTop: number;
-    let curMarginTop: number;
-    const elem =  this.headingElementRef.reduce((previousValue, currentValue) => {
-      preRect = previousValue.getBoundingClientRect();
-      curRect = currentValue.getBoundingClientRect();
-      preMarginTop = this.headingElementMarginTop[previousValue.id];
-      curMarginTop = this.headingElementMarginTop[currentValue.id];
-      // 过滤在顶部之下的标题
-      if (curRect.top - baseOffsetTop - curMarginTop > 0) {
-        return previousValue;
-      }
-      // 找到距离顶部最近的标题
-      if ((curRect.top - baseOffsetTop - curMarginTop) > (preRect.top - baseOffsetTop - preMarginTop)) {
-        return currentValue;
-      } else {
-        return previousValue;
-      }
-    });
-    return elem.id;
-  }
-
-  /**
-   * 更新渲染后的html内容中的标题部分(h1 ~ h6)到headingElementRef
-   */
-  updateHeadingInfo() {
-    const nodeList = (<Element> this.markdownBody.nativeElement).querySelectorAll('h1, h2');
-    if (nodeList === undefined || nodeList === null) {
-      return;
-    }
-
-    this.headingElementRef.splice(0);
-    const nodes: Array<HTMLElement> = [];
-    for (let i = 0; i < nodeList.length; i++) {
-      const value = <HTMLElement> nodeList[i];
-      // 提取element的样式
-      const marginTop = this.getComputedStyle(value, 'margin-top');
-      this.headingElementMarginTop[value.id] = ParseUnit.checkUnit(marginTop).number;
-      nodes.push(value);
-    }
-    // Element.style.xxx只能读取行内样式
-    this.headingElementRef.push(...nodes);
-  }
-
-  getComputedStyle(element: Element, property: string, pseudoElt?: string): string {
-    return window.getComputedStyle(element, null).getPropertyValue(property);
-  }
-
-  private bindMutationObserver() {
-    const _observer = new MutationObserver((mutations: Array<MutationRecord>, observer: MutationObserver) => {
-      console.log('asd');
-      this.markdownBody.nativeElement.scrollTop = 100;
-    });
-
-    _observer.observe(this.markdownBody.nativeElement, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-      characterDataOldValue: true
-    });
+      .subscribe(value => {
+      });
   }
 }

@@ -9,11 +9,16 @@
   <!-- edit content -->
   <!-- 编辑框 -->
   <!--disable: nbSyncScroll-->
-  <div class="edit-content"
+  <div #editWindow
+       class="edit-content"
+       nbSyncScroll
+       [syncScrollInfo]="syncScroll"
   >
-    <div id="editArea"
+    <div #editArea
          class="edit-area"
          contenteditable="true"
+         (keyup)="keyUp($event)"
+         (paste)="paste($event)"
     >
     </div>
   </div>

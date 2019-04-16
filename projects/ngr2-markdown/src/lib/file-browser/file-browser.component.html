@@ -55,7 +55,8 @@
           </i>
           <span>{{ data.name }}</span>
         </li>
-        <li *ngIf="data.type === 'article'" class="fb-li_hover"
+        <li *ngIf="data.type === 'article'"
+            class="fb-li_hover"
             (click)="select($any($event.currentTarget), data)"
             (dblclick)="open($any($event.currentTarget), data)"
         >

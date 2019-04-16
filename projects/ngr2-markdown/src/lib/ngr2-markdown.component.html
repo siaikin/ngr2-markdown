@@ -20,9 +20,11 @@
     <!--disable: nbSyncScroll-->
     <article #markdownBody
              class="markdown-preview"
+             nbSyncScroll
+             [syncScrollInfo]="syncScroll"
     >
       <div [ngClass]="[_options.bodyClassName]"
-           [innerHTML]="_html"
+           [innerHTML]="_html | safe:'html'"
       >
       </div>
     </article>

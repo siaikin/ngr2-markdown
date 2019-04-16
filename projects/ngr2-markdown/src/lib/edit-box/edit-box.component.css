@@ -16,9 +16,12 @@
 }
 
 .edit-area {
+  position: relative;
   /* 不可分割单词强制换行 */
   overflow-wrap: break-word;
   outline: none;
-  padding: 20px;
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 10px 10px 120px 10px;
   background-color: white;
 }
