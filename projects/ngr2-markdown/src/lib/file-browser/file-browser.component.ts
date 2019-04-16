@@ -249,7 +249,6 @@ export class FileBrowserComponent implements OnInit {
         .getAll<any>()
         .subscribe(value => {
           if (value.type === IndexedDBEventType.COMPLETE) {
-            console.log(value);
             this.fileTree = new Tree(value.data);
             resolve(value);
           }

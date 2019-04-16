@@ -16,7 +16,6 @@ export class TreeNodeToggleDirective {
   @Output() callbackFn = new EventEmitter<TreeNodeComponent>();
 
   constructor(private treeNode: TreeNodeComponent) {
-    console.log(treeNode);
   }
 
 }

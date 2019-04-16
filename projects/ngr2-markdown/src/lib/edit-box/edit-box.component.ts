@@ -35,10 +35,6 @@ export class EditBoxComponent implements OnInit {
     }
   }
   get content(): string {
-    console.log({
-      before: this._editArea.innerText,
-      after: this._editArea.innerText.replace(/\n\n/g, '\n')
-    });
     return this._editArea.innerText.replace(/\n\n/g, '\n');
   }
 
